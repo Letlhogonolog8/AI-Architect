@@ -3,13 +3,27 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: AEGISDRIVE AI Command Center API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: vehicles
+    description: Protected vehicle management
+  - name: drivers
+    description: Driver profile management
+  - name: incidents
+    description: Incident management
+  - name: alerts
+    description: Threat alert management
+  - name: evidence
+    description: Evidence vault
+  - name: dashboard
+    description: Dashboard summaries and aggregates
+  - name: analytics
+    description: AI threat analytics
 paths:
   /healthz:
     get:
@@ -24,13 +38,871 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # ─── VEHICLES ────────────────────────────────────────────────────────────────
+  /vehicles:
+    get:
+      operationId: listVehicles
+      tags: [vehicles]
+      summary: List all protected vehicles
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [safe, alert, emergency, offline]
+      responses:
+        "200":
+          description: List of vehicles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Vehicle"
+    post:
+      operationId: createVehicle
+      tags: [vehicles]
+      summary: Register a vehicle for protection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VehicleInput"
+      responses:
+        "201":
+          description: Vehicle created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vehicle"
+
+  /vehicles/{id}:
+    get:
+      operationId: getVehicle
+      tags: [vehicles]
+      summary: Get a vehicle by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Vehicle found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vehicle"
+        "404":
+          description: Vehicle not found
+    patch:
+      operationId: updateVehicle
+      tags: [vehicles]
+      summary: Update vehicle details or status
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VehicleUpdate"
+      responses:
+        "200":
+          description: Vehicle updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vehicle"
+        "404":
+          description: Vehicle not found
+    delete:
+      operationId: deleteVehicle
+      tags: [vehicles]
+      summary: Remove a vehicle from protection
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      responses:
+        "204":
+          description: Vehicle deleted
+        "404":
+          description: Vehicle not found
+
+  # ─── DRIVERS ─────────────────────────────────────────────────────────────────
+  /drivers:
+    get:
+      operationId: listDrivers
+      tags: [drivers]
+      summary: List all driver profiles
+      responses:
+        "200":
+          description: List of drivers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Driver"
+    post:
+      operationId: createDriver
+      tags: [drivers]
+      summary: Create a driver profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DriverInput"
+      responses:
+        "201":
+          description: Driver created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Driver"
+
+  /drivers/{id}:
+    get:
+      operationId: getDriver
+      tags: [drivers]
+      summary: Get a driver by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Driver found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Driver"
+        "404":
+          description: Driver not found
+    patch:
+      operationId: updateDriver
+      tags: [drivers]
+      summary: Update driver profile
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DriverUpdate"
+      responses:
+        "200":
+          description: Driver updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Driver"
+        "404":
+          description: Driver not found
+
+  # ─── INCIDENTS ────────────────────────────────────────────────────────────────
+  /incidents:
+    get:
+      operationId: listIncidents
+      tags: [incidents]
+      summary: List incidents, optionally filtered
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [active, investigating, resolved, escalated]
+        - in: query
+          name: vehicleId
+          schema:
+            type: number
+        - in: query
+          name: severity
+          schema:
+            type: string
+            enum: [low, medium, high, critical]
+      responses:
+        "200":
+          description: List of incidents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Incident"
+    post:
+      operationId: createIncident
+      tags: [incidents]
+      summary: Report a new incident
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IncidentInput"
+      responses:
+        "201":
+          description: Incident created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Incident"
+
+  /incidents/{id}:
+    get:
+      operationId: getIncident
+      tags: [incidents]
+      summary: Get an incident by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Incident found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Incident"
+        "404":
+          description: Incident not found
+    patch:
+      operationId: updateIncident
+      tags: [incidents]
+      summary: Update incident status or details
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IncidentUpdate"
+      responses:
+        "200":
+          description: Incident updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Incident"
+        "404":
+          description: Incident not found
+
+  /incidents/{id}/timeline:
+    get:
+      operationId: getIncidentTimeline
+      tags: [incidents]
+      summary: Get chronological event timeline for an incident
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Incident timeline events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TimelineEvent"
+        "404":
+          description: Incident not found
+
+  # ─── ALERTS ──────────────────────────────────────────────────────────────────
+  /alerts:
+    get:
+      operationId: listAlerts
+      tags: [alerts]
+      summary: List threat alerts
+      parameters:
+        - in: query
+          name: acknowledged
+          schema:
+            type: boolean
+        - in: query
+          name: vehicleId
+          schema:
+            type: number
+        - in: query
+          name: severity
+          schema:
+            type: string
+            enum: [low, medium, high, critical]
+      responses:
+        "200":
+          description: List of alerts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Alert"
+
+  /alerts/{id}/acknowledge:
+    patch:
+      operationId: acknowledgeAlert
+      tags: [alerts]
+      summary: Acknowledge a threat alert
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Alert acknowledged
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Alert"
+        "404":
+          description: Alert not found
+
+  # ─── EVIDENCE ────────────────────────────────────────────────────────────────
+  /evidence:
+    get:
+      operationId: listEvidence
+      tags: [evidence]
+      summary: List evidence items
+      parameters:
+        - in: query
+          name: incidentId
+          schema:
+            type: number
+        - in: query
+          name: vehicleId
+          schema:
+            type: number
+        - in: query
+          name: type
+          schema:
+            type: string
+            enum: [video, audio, gps_track, sensor_log, ai_analysis]
+      responses:
+        "200":
+          description: List of evidence items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Evidence"
+
+  /evidence/{id}:
+    get:
+      operationId: getEvidence
+      tags: [evidence]
+      summary: Get a single evidence item
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Evidence item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Evidence"
+        "404":
+          description: Evidence not found
+
+  # ─── DASHBOARD ───────────────────────────────────────────────────────────────
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get command center dashboard summary
+      responses:
+        "200":
+          description: Dashboard summary statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /dashboard/recent-activity:
+    get:
+      operationId: getRecentActivity
+      tags: [dashboard]
+      summary: Get recent activity feed (incidents + alerts combined)
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: number
+            default: 20
+      responses:
+        "200":
+          description: Recent activity items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityItem"
+
+  # ─── ANALYTICS ───────────────────────────────────────────────────────────────
+  /analytics/threat-trends:
+    get:
+      operationId: getThreatTrends
+      tags: [analytics]
+      summary: Get incident counts grouped by type over time
+      parameters:
+        - in: query
+          name: days
+          schema:
+            type: number
+            default: 30
+      responses:
+        "200":
+          description: Threat trend data points
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ThreatTrendPoint"
+
+  /analytics/vehicle-risk:
+    get:
+      operationId: getVehicleRiskScores
+      tags: [analytics]
+      summary: Get risk scores per vehicle based on incident history
+      responses:
+        "200":
+          description: Vehicle risk scores
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/VehicleRiskScore"
+
 components:
   schemas:
     HealthStatus:
       type: object
+      required: [status]
       properties:
         status:
           type: string
-      required:
-        - status
 
+    # ─── VEHICLE ───────────────────────────────────────────────────────────────
+    Vehicle:
+      type: object
+      required: [id, name, make, model, year, licensePlate, status, threatLevel, createdAt]
+      properties:
+        id:
+          type: number
+        name:
+          type: string
+        make:
+          type: string
+        model:
+          type: string
+        year:
+          type: number
+        licensePlate:
+          type: string
+        status:
+          type: string
+          enum: [safe, alert, emergency, offline]
+        threatLevel:
+          type: number
+          description: AI-computed threat score 0-100
+        driverId:
+          type: ["number", "null"]
+        locationLat:
+          type: ["number", "null"]
+        locationLng:
+          type: ["number", "null"]
+        lastSeenAt:
+          type: ["string", "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+
+    VehicleInput:
+      type: object
+      required: [name, make, model, year, licensePlate]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        make:
+          type: string
+          minLength: 1
+        model:
+          type: string
+          minLength: 1
+        year:
+          type: number
+        licensePlate:
+          type: string
+          minLength: 1
+        driverId:
+          type: ["number", "null"]
+
+    VehicleUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        make:
+          type: string
+        model:
+          type: string
+        year:
+          type: number
+        licensePlate:
+          type: string
+        status:
+          type: string
+          enum: [safe, alert, emergency, offline]
+        threatLevel:
+          type: number
+        driverId:
+          type: ["number", "null"]
+        locationLat:
+          type: ["number", "null"]
+        locationLng:
+          type: ["number", "null"]
+        lastSeenAt:
+          type: ["string", "null"]
+          format: date-time
+
+    # ─── DRIVER ────────────────────────────────────────────────────────────────
+    Driver:
+      type: object
+      required: [id, name, phone, status, behaviorScore, createdAt]
+      properties:
+        id:
+          type: number
+        name:
+          type: string
+        phone:
+          type: string
+        email:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [active, inactive, suspended]
+        behaviorScore:
+          type: number
+          description: AI-computed driver behavior score 0-100
+        createdAt:
+          type: string
+          format: date-time
+
+    DriverInput:
+      type: object
+      required: [name, phone]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        phone:
+          type: string
+          minLength: 1
+        email:
+          type: ["string", "null"]
+
+    DriverUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        phone:
+          type: string
+        email:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [active, inactive, suspended]
+        behaviorScore:
+          type: number
+
+    # ─── INCIDENT ──────────────────────────────────────────────────────────────
+    Incident:
+      type: object
+      required: [id, vehicleId, type, severity, status, aiConfidence, startedAt, createdAt]
+      properties:
+        id:
+          type: number
+        vehicleId:
+          type: number
+        driverId:
+          type: ["number", "null"]
+        type:
+          type: string
+          enum: [hijacking, theft_attempt, coercion, kidnapping, suspicious_activity, sos_triggered]
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        status:
+          type: string
+          enum: [active, investigating, resolved, escalated]
+        description:
+          type: ["string", "null"]
+        aiConfidence:
+          type: number
+          description: AI confidence score 0.0–1.0
+        latitude:
+          type: ["number", "null"]
+        longitude:
+          type: ["number", "null"]
+        startedAt:
+          type: string
+          format: date-time
+        resolvedAt:
+          type: ["string", "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+
+    IncidentInput:
+      type: object
+      required: [vehicleId, type, severity]
+      properties:
+        vehicleId:
+          type: number
+        driverId:
+          type: ["number", "null"]
+        type:
+          type: string
+          enum: [hijacking, theft_attempt, coercion, kidnapping, suspicious_activity, sos_triggered]
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        description:
+          type: ["string", "null"]
+        aiConfidence:
+          type: number
+        latitude:
+          type: ["number", "null"]
+        longitude:
+          type: ["number", "null"]
+
+    IncidentUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [active, investigating, resolved, escalated]
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        description:
+          type: ["string", "null"]
+        resolvedAt:
+          type: ["string", "null"]
+          format: date-time
+
+    TimelineEvent:
+      type: object
+      required: [id, incidentId, eventType, description, occurredAt]
+      properties:
+        id:
+          type: number
+        incidentId:
+          type: number
+        eventType:
+          type: string
+          enum: [incident_created, status_changed, alert_triggered, evidence_added, ai_update, operator_note]
+        description:
+          type: string
+        occurredAt:
+          type: string
+          format: date-time
+        metadata:
+          type: ["string", "null"]
+          description: JSON metadata string for event context
+
+    # ─── ALERT ─────────────────────────────────────────────────────────────────
+    Alert:
+      type: object
+      required: [id, vehicleId, type, message, severity, createdAt]
+      properties:
+        id:
+          type: number
+        vehicleId:
+          type: number
+        incidentId:
+          type: ["number", "null"]
+        type:
+          type: string
+          enum: [threat_detected, geofence_breach, unusual_behavior, sos_triggered, engine_immobilized, identity_mismatch]
+        message:
+          type: string
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        createdAt:
+          type: string
+          format: date-time
+        acknowledgedAt:
+          type: ["string", "null"]
+          format: date-time
+
+    # ─── EVIDENCE ──────────────────────────────────────────────────────────────
+    Evidence:
+      type: object
+      required: [id, incidentId, vehicleId, type, filename, capturedAt, createdAt]
+      properties:
+        id:
+          type: number
+        incidentId:
+          type: number
+        vehicleId:
+          type: number
+        type:
+          type: string
+          enum: [video, audio, gps_track, sensor_log, ai_analysis]
+        filename:
+          type: string
+        url:
+          type: ["string", "null"]
+        sizeBytes:
+          type: ["number", "null"]
+        aiSummary:
+          type: ["string", "null"]
+        capturedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+
+    # ─── DASHBOARD ─────────────────────────────────────────────────────────────
+    DashboardSummary:
+      type: object
+      required: [totalVehicles, activeIncidents, unresolvedAlerts, criticalAlerts, vehiclesByStatus, incidentsBySeverity, threatLevelAvg]
+      properties:
+        totalVehicles:
+          type: number
+        activeIncidents:
+          type: number
+        unresolvedAlerts:
+          type: number
+        criticalAlerts:
+          type: number
+        threatLevelAvg:
+          type: number
+        vehiclesByStatus:
+          type: object
+          properties:
+            safe:
+              type: number
+            alert:
+              type: number
+            emergency:
+              type: number
+            offline:
+              type: number
+          required: [safe, alert, emergency, offline]
+        incidentsBySeverity:
+          type: object
+          properties:
+            low:
+              type: number
+            medium:
+              type: number
+            high:
+              type: number
+            critical:
+              type: number
+          required: [low, medium, high, critical]
+
+    ActivityItem:
+      type: object
+      required: [id, kind, title, severity, timestamp]
+      properties:
+        id:
+          type: number
+        kind:
+          type: string
+          enum: [incident, alert]
+        title:
+          type: string
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        vehicleId:
+          type: number
+        vehicleName:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    # ─── ANALYTICS ─────────────────────────────────────────────────────────────
+    ThreatTrendPoint:
+      type: object
+      required: [date, hijacking, theft_attempt, coercion, kidnapping, suspicious_activity, sos_triggered]
+      properties:
+        date:
+          type: string
+        hijacking:
+          type: number
+        theft_attempt:
+          type: number
+        coercion:
+          type: number
+        kidnapping:
+          type: number
+        suspicious_activity:
+          type: number
+        sos_triggered:
+          type: number
+
+    VehicleRiskScore:
+      type: object
+      required: [vehicleId, vehicleName, licensePlate, riskScore, incidentCount, lastIncidentAt]
+      properties:
+        vehicleId:
+          type: number
+        vehicleName:
+          type: string
+        licensePlate:
+          type: string
+        riskScore:
+          type: number
+          description: 0-100 risk score
+        incidentCount:
+          type: number
+        lastIncidentAt:
+          type: ["string", "null"]
+          format: date-time
