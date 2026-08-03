@@ -1,0 +1,15 @@
+@import 'tailwindcss';
+
+/* The AEGISDRIVE design system: palette, typography, radii, shadows, motion. */
+@import '@aegisdrive/ui/styles.css';
+
+/*
+ * Tailwind scans only the importing project by default. Without this, every
+ * class name used inside @aegisdrive/ui components would be absent from the
+ * production stylesheet — the components would render unstyled in a build while
+ * looking correct in dev, which is the worst possible failure mode.
+ */
+@source '../../../packages/ui/src';
+
+/* Dark is the only theme. The class on <html> keeps `dark:` variants usable. */
+@custom-variant dark (&:where(.dark, .dark *));

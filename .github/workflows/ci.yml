@@ -1,0 +1,203 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# A new push to a PR makes the in-flight run obsolete. Cancel it rather than
+# paying for both. `main` is excluded: every commit there must have a result.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  NODE_VERSION: '22'
+
+# Read-only by default. Individual jobs opt into more if they ever need it.
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Typecheck, lint and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      # `--frozen-lockfile` fails the build when a package.json change was
+      # committed without the lockfile. That drift is how "works on my machine"
+      # reaches production.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The API and both workers import the generated Prisma client, so nothing
+      # downstream can typecheck until it exists.
+      - name: Generate Prisma client
+        run: pnpm --filter @aegisdrive/api run db:generate
+
+      - name: Validate Prisma schema
+        run: pnpm --filter @aegisdrive/api exec prisma validate
+
+      - name: Check formatting
+        run: pnpm run format:check
+
+      - name: Typecheck workspace
+        run: pnpm run typecheck
+
+      - name: Build
+        run: pnpm -r --if-present run build
+        env:
+          # Same-origin at runtime; the ingress routes /api to the API.
+          VITE_API_BASE_URL: ''
+
+  migrations:
+    name: Migrations apply cleanly
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # Proves the migration history replays from empty onto a real Postgres.
+    # A migration that only works against a developer's drifted local database
+    # is a failed deploy waiting to happen.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: aegis
+          POSTGRES_PASSWORD: aegis
+          POSTGRES_DB: aegisdrive_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U aegis"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Apply migrations
+        run: pnpm --filter @aegisdrive/api run db:deploy
+        env:
+          DATABASE_URL: postgresql://aegis:aegis@localhost:5432/aegisdrive_ci?schema=public
+
+      # Reconciling roles is idempotent and runs on every deploy, so it must be
+      # proven idempotent here — including on a second run.
+      - name: Seed roles (twice, to prove idempotency)
+        run: |
+          pnpm --filter @aegisdrive/api run db:seed
+          pnpm --filter @aegisdrive/api run db:seed
+        env:
+          NODE_ENV: production
+          DATABASE_URL: postgresql://aegis:aegis@localhost:5432/aegisdrive_ci?schema=public
+
+  mobile:
+    name: Driver app
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # apps/mobile is outside the pnpm workspace (ADR-0003), so it installs and
+    # verifies on its own. The root `pnpm run typecheck` does not cover it.
+    defaults:
+      run:
+        working-directory: apps/mobile
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # The enum mirror is checked BEFORE install: it is a plain Node script
+      # with no dependencies, and a drift there is the cheapest failure to
+      # surface. A mismatch between this file and packages/types is a silent
+      # data bug, not a compile error, so it gets its own gate.
+      - name: Check enum mirror against packages/types
+        run: node scripts/check-enum-drift.mjs
+
+      - name: Install
+        run: pnpm install --ignore-workspace --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+  python:
+    name: AI service
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: services/ai
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          # Without the heavy inference extras: the gateway is designed to be
+          # importable and testable without ONNX Runtime or CUDA.
+          pip install -e ".[dev]"
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Typecheck
+        run: mypy app
+
+      - name: Import check
+        run: python -c "from app.main import app; print('gateway imports cleanly')"
+
+  docker:
+    name: Container images build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: verify
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: api
+            dockerfile: apps/api/Dockerfile
+          - name: web
+            dockerfile: apps/web/Dockerfile
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build ${{ matrix.name }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          # Verification only. Publishing happens in the release workflow, from
+          # a tag, so an unreviewed commit can never become a deployable image.
+          push: false
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}

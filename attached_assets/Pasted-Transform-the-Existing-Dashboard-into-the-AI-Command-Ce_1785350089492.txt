@@ -1,0 +1,511 @@
+Transform the Existing Dashboard into the AI Command Centre
+
+You are continuing development of AEGISDRIVE AI™ (Vehicle Protection Operating System - VPOS).
+
+This is NOT a fleet management dashboard.
+
+This is NOT a GPS tracking system.
+
+This is NOT a vehicle monitoring website.
+
+It is an enterprise Artificial Intelligence Operating System that predicts, detects, prevents, responds to and recovers from vehicle hijackings using multiple AI engines.
+
+Do NOT redesign everything from scratch.
+
+Instead, upgrade and transform the existing dashboard into the AI Command Centre while keeping the current routing, layout, authentication and project structure.
+
+DESIGN
+
+Replace the current white admin theme with a premium dark command centre.
+
+Design inspiration:
+
+• Tesla Fleet
+• Palantir Gotham
+• Apple
+• Mercedes MBUX
+• NASA Mission Control
+• Bloomberg Terminal
+
+Use
+
+Dark background
+
+Blue holographic accents
+
+Glassmorphism
+
+Subtle gradients
+
+Animated glow
+
+Modern typography
+
+Rounded cards
+
+Smooth transitions
+
+Professional enterprise appearance
+
+Everything should feel like software used inside a national emergency operations centre.
+
+DASHBOARD
+
+Replace the current dashboard with an AI Incident Command Centre.
+
+Top KPI cards
+
+Protected Vehicles
+
+Active Incidents
+
+Threat Level
+
+Hijack Probability
+
+Driver Confidence
+
+AI Decisions Today
+
+Emergency Responses
+
+Evidence Packages
+
+The centre of the screen should contain a large live tactical map.
+
+The map should support future integration with Mapbox.
+
+For now create realistic placeholder data.
+
+Show
+
+Vehicles
+
+SafeCorridor routes
+
+Police stations
+
+Hospitals
+
+Security companies
+
+Crime hotspots
+
+Traffic
+
+Response teams
+
+Destination Safe Zone
+
+The selected vehicle should animate along the route.
+
+RIGHT PANEL
+
+Create a live AI Incident Summary.
+
+Display
+
+Threat Score
+
+Hijack Probability
+
+Driver Confidence
+
+Passenger Risk
+
+Weapon Detection
+
+Behaviour Analysis
+
+Driver Stress
+
+Identity Confidence
+
+Vehicle Health
+
+Communication Status
+
+System Health
+
+Update values live every few seconds using simulated data.
+
+BOTTOM SECTION
+
+Create four live camera cards.
+
+Front Camera
+
+Cabin Camera
+
+Rear Camera
+
+Evidence Camera
+
+Use realistic placeholders.
+
+Each camera card must display
+
+Connection status
+
+Timestamp
+
+Recording indicator
+
+AI detections
+
+Confidence percentage
+
+Future-ready for WebRTC integration.
+
+NOTIFICATION CENTRE
+
+Replace the existing notifications.
+
+Create four dispatch cards.
+
+Police
+
+Private Security
+
+Emergency Contacts
+
+Insurance Company
+
+Each dispatch should display
+
+Status
+
+Delivered
+
+Acknowledged
+
+Response ETA
+
+Timestamp
+
+EVIDENCE VAULT
+
+Replace the existing evidence page.
+
+Create an enterprise digital evidence system.
+
+Each incident should contain
+
+Encrypted Video
+
+Encrypted Audio
+
+GPS Route
+
+Timeline
+
+AI Analysis
+
+Digital Signature
+
+SHA-256 Hash
+
+Chain of Custody
+
+Cryptographically Sealed
+
+Create a modern digital safe appearance.
+
+AI DECISION LOG
+
+Create a live scrolling console.
+
+Example events
+
+Threat confidence increased
+
+Behaviour anomaly detected
+
+Continuous identity mismatch
+
+Weapon suspected
+
+SafeCorridor calculated
+
+Police notified
+
+Security company notified
+
+Silent SOS activated
+
+Evidence encrypted
+
+Recovery Mesh armed
+
+AI learning updated
+
+Animate new log entries every few seconds.
+
+FLEET PAGE
+
+Upgrade Fleet Registry.
+
+Each vehicle card should display
+
+Vehicle photo
+
+Live status
+
+Driver
+
+Passengers
+
+Threat Level
+
+Current Route
+
+Nearest Safe Zone
+
+Battery/Fuel
+
+Connection Quality
+
+Last AI Decision
+
+Clicking a vehicle opens a full Incident View.
+
+PERSONNEL PAGE
+
+Upgrade Driver Registry.
+
+Each driver profile should include
+
+Profile photo
+
+Continuous Identity Confidence
+
+Behaviour Score
+
+Driving Risk
+
+Historical Risk Trend
+
+Biometric Status
+
+Trusted Devices
+
+Wearables Connected
+
+Last Authentication
+
+Recent Behaviour Timeline
+
+INCIDENT PAGE
+
+Each incident opens a complete Incident Workspace.
+
+Display
+
+Timeline
+
+Threat evolution
+
+AI decisions
+
+Camera recordings
+
+Audio
+
+GPS replay
+
+Evidence
+
+Notification history
+
+Recovery actions
+
+Operator notes
+
+Chain of custody
+
+ACTIVE ALERTS
+
+Create a live alert feed.
+
+Include filtering.
+
+Severity
+
+Critical
+
+High
+
+Medium
+
+Low
+
+Each alert should animate when received.
+
+INTELLIGENCE PAGE
+
+Transform into an AI analytics centre.
+
+Display
+
+Hijacking hotspots
+
+Behaviour trends
+
+Crime heatmaps
+
+Vehicle risk scores
+
+Predictive AI charts
+
+Recovery success rate
+
+Monthly statistics
+
+Threat forecasting
+
+GLOBAL SEARCH
+
+Create a universal search bar.
+
+Search
+
+Drivers
+
+Vehicles
+
+Incidents
+
+Evidence
+
+Operators
+
+Alerts
+
+AI logs
+
+REAL-TIME ENGINE
+
+Implement simulated real-time updates using WebSockets or polling architecture.
+
+Values should continuously change.
+
+Threat scores
+
+Vehicle movement
+
+AI confidence
+
+Camera status
+
+Notifications
+
+Logs
+
+COMPONENT ARCHITECTURE
+
+Refactor into reusable React components.
+
+Examples
+
+DashboardLayout
+
+TacticalMap
+
+ThreatGauge
+
+CameraGrid
+
+IncidentTimeline
+
+NotificationPanel
+
+EvidenceVault
+
+DecisionLog
+
+VehicleCard
+
+DriverCard
+
+AlertFeed
+
+Charts
+
+Use clean TypeScript interfaces.
+
+BACKEND
+
+Prepare backend API structure.
+
+Do not implement full AI yet.
+
+Create placeholder endpoints.
+
+Example
+
+/api/dashboard
+
+/api/vehicles
+
+/api/incidents
+
+/api/evidence
+
+/api/alerts
+
+/api/telemetry
+
+/api/ai
+
+/api/operators
+
+Return realistic mock JSON.
+
+RESPONSIVE DESIGN
+
+Desktop
+
+Laptop
+
+Tablet
+
+Ultra-wide displays
+
+Future-ready for mobile operator interface.
+
+DO NOT
+
+Do not simplify the UI.
+
+Do not remove existing pages.
+
+Do not replace pages with static mockups.
+
+Do not create fake screenshots.
+
+Build real React components using the existing codebase.
+
+Maintain production-quality code.
+
+GOAL
+
+Transform the existing project into an enterprise-grade AI Security Operations Centre that resembles software used by emergency response agencies.
+
+Everything must remain modular because future phases will integrate:
+
+• Continuous Identity Engine
+• Behaviour Intelligence Engine
+• Cabin Intelligence Engine
+• Threat Decision Engine
+• SafeCorridor AI Escort
+• Silent Emergency Engine
+• Recovery Mesh
+• Evidence Vault
+• Driver Mobile App
+• AI Models
+• Edge AI
+• Real-time streaming
+• WebRTC
+• IoT devices
+
+The architecture must support enterprise scalability, future AI integration, and production deployment.

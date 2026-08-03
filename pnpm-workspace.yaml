@@ -35,26 +35,53 @@ minimumReleaseAgeExclude:
   - stripe-replit-sync
 
 packages:
+  # AEGISDRIVE AI (VPOS) monorepo
+  - apps/web
+  - apps/api
+  - packages/*
+  - services/notifications
+  - services/evidence
+  - services/telemetry
+  # Legacy Replit prototype (see docs/adr/0001-monorepo-structure.md)
   - artifacts/*
   - lib/*
   - lib/integrations/*
   - scripts
 
 catalog:
+  '@prisma/client': ^6.19.0
   '@replit/vite-plugin-cartographer': ^0.5.21
   '@replit/vite-plugin-dev-banner': ^0.1.1
   '@replit/vite-plugin-runtime-error-modal': ^0.0.6
   '@tailwindcss/vite': ^4.1.14
   '@tanstack/react-query': ^5.90.21
+  '@types/cookie-parser': ^1.4.10
+  '@types/cors': ^2.8.19
+  '@types/express': ^5.0.6
+  '@types/jsonwebtoken': ^9.0.10
   '@types/node': ^25.3.3
   '@types/react': ^19.2.0
   '@types/react-dom': ^19.2.0
   '@vitejs/plugin-react': ^5.0.4
+  bcryptjs: ^3.0.2
   class-variance-authority: ^0.7.1
   clsx: ^2.1.1
+  cookie-parser: ^1.4.7
+  cors: ^2.8.5
   drizzle-orm: ^0.45.2
+  express: ^5.2.1
   framer-motion: ^12.23.24
+  helmet: ^8.1.0
+  ioredis: ^5.10.0
+  jsonwebtoken: ^9.0.2
   lucide-react: ^0.545.0
+  pino: ^9.14.0
+  pino-http: ^10.5.0
+  prisma: ^6.19.0
+  react-router-dom: ^7.9.4
+  socket.io: ^4.8.1
+  socket.io-client: ^4.8.1
+  zustand: ^5.0.8
   # Must be this exact version because expo requires it
   react: 19.1.0
   # Must be this exact version because expo requires it
@@ -69,13 +96,24 @@ catalog:
 autoInstallPeers: false
 
 onlyBuiltDependencies:
+  - '@prisma/client'
+  - '@prisma/engines'
   - '@swc/core'
   - esbuild
   - msw
+  - prisma
   - unrs-resolver
 
 overrides:
-  # replit uses linux-x64 only, we can exclude all other platforms
+  # Replit deploys linux-x64, so binaries for other platforms are excluded to
+  # keep the install small.
+  #
+  # win32-x64 is deliberately NOT excluded, unlike the other non-linux targets.
+  # Developers work on Windows, and stripping the win32-x64 binaries for
+  # rollup, @tailwindcss/oxide, lightningcss or esbuild makes `vite build` fail
+  # locally with a bare MODULE_NOT_FOUND that gives no hint it came from this
+  # file. Four extra packages is a cheap price for a working local build, and
+  # linux-x64 installs are completely unaffected.
   "esbuild>@esbuild/darwin-arm64": "-"
   "esbuild>@esbuild/darwin-x64": "-"
   "esbuild>@esbuild/freebsd-arm64": "-"
@@ -95,7 +133,6 @@ overrides:
   "esbuild>@esbuild/sunos-x64": "-"
   "esbuild>@esbuild/win32-arm64": "-"
   "esbuild>@esbuild/win32-ia32": "-"
-  "esbuild>@esbuild/win32-x64": "-"
   "esbuild>@esbuild/aix-ppc64": '-'
   "esbuild>@esbuild/android-arm": '-'
   "esbuild>@esbuild/android-arm64": '-'
@@ -110,7 +147,6 @@ overrides:
   "lightningcss>lightningcss-linux-arm64-musl": "-"
   "lightningcss>lightningcss-linux-x64-musl": "-"
   "lightningcss>lightningcss-win32-arm64-msvc": "-"
-  "lightningcss>lightningcss-win32-x64-msvc": "-"
   "@tailwindcss/oxide>@tailwindcss/oxide-android-arm64": "-"
   "@tailwindcss/oxide>@tailwindcss/oxide-darwin-arm64": "-"
   "@tailwindcss/oxide>@tailwindcss/oxide-darwin-x64": "-"
@@ -119,7 +155,6 @@ overrides:
   "@tailwindcss/oxide>@tailwindcss/oxide-linux-arm64-gnu": "-"
   "@tailwindcss/oxide>@tailwindcss/oxide-linux-arm64-musl": "-"
   "@tailwindcss/oxide>@tailwindcss/oxide-win32-arm64-msvc": "-"
-  "@tailwindcss/oxide>@tailwindcss/oxide-win32-x64-msvc": "-"
   "@tailwindcss/oxide>@tailwindcss/oxide-linux-x64-musl": "-"
   "rollup>@rollup/rollup-android-arm-eabi": "-"
   "rollup>@rollup/rollup-android-arm64": "-"
@@ -144,7 +179,6 @@ overrides:
   "rollup>@rollup/rollup-win32-arm64-msvc": "-"
   "rollup>@rollup/rollup-win32-ia32-msvc": "-"
   "rollup>@rollup/rollup-win32-x64-gnu": "-"
-  "rollup>@rollup/rollup-win32-x64-msvc": "-"
   "@expo/ngrok-bin>@expo/ngrok-bin-darwin-arm64": "-"
   "@expo/ngrok-bin>@expo/ngrok-bin-darwin-x64": "-"
   "@expo/ngrok-bin>@expo/ngrok-bin-freebsd-ia32": "-"

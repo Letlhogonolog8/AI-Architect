@@ -1,14 +1,28 @@
 {
-  "name": "workspace",
-  "version": "0.0.0",
+  "name": "aegisdrive-ai",
+  "version": "0.1.0",
   "license": "MIT",
+  "description": "AEGISDRIVE AI - AI Vehicle Protection Operating System (VPOS)",
   "scripts": {
     "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
     "typecheck:libs": "tsc --build",
-    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
+    "typecheck:apps": "pnpm -r --filter \"./apps/**\" --filter \"./services/**\" --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
+    "typecheck": "pnpm run typecheck:libs && pnpm run typecheck:apps",
+    "format": "prettier --write \"{apps,packages,services,docs}/**/*.{ts,tsx,json,md,css}\"",
+    "format:check": "prettier --check \"{apps,packages,services,docs}/**/*.{ts,tsx,json,md,css}\"",
+    "dev:api": "pnpm --filter @aegisdrive/api run dev",
+    "dev:web": "pnpm --filter @aegisdrive/web run dev",
+    "db:generate": "pnpm --filter @aegisdrive/api run db:generate",
+    "db:migrate": "pnpm --filter @aegisdrive/api run db:migrate",
+    "db:seed": "pnpm --filter @aegisdrive/api run db:seed",
+    "docker:up": "docker compose -f infra/docker/docker-compose.yml up -d",
+    "docker:down": "docker compose -f infra/docker/docker-compose.yml down"
   },
   "private": true,
+  "engines": {
+    "node": ">=22"
+  },
   "dependencies": {
     "@replit/connectors-sdk": "^0.4.1"
   },

@@ -1,0 +1,57 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly, Monday 04:00 UTC. A dependency that was clean at merge time can be
+    # disclosed as vulnerable a week later; only a scheduled run catches that.
+    - cron: '0 4 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # High and critical fail the build. Moderate and low are reported but do
+      # not block: a hard gate on every low finding trains people to bypass the
+      # gate, which is worse than the findings.
+      - name: Audit (high and above)
+        run: pnpm audit --audit-level high
+
+      - name: Report all findings
+        if: always()
+        run: pnpm audit || true
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history: a secret committed and then reverted is still a
+          # secret, and a shallow clone would miss it.
+          fetch-depth: 0
+
+      - name: Scan for committed credentials
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

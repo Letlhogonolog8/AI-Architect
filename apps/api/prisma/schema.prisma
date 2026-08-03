@@ -1,0 +1,1824 @@
+// AEGISDRIVE AI — data model.
+//
+// Conventions enforced across every model:
+//   * UUID primary keys. Sequential integers leak tenant volume and make
+//     cross-service references guessable.
+//   * Every tenant-owned row carries `organizationId` and indexes it first.
+//     Row-level isolation is enforced in the repository layer; the compound
+//     indexes here are what make that enforcement free.
+//   * `createdAt` / `updatedAt` on every mutable model.
+//   * Enum values are byte-identical to packages/types/src/enums.ts.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// Enumerations
+// ============================================================================
+
+enum RoleName {
+  ADMIN
+  OPERATOR
+  SECURITY
+  POLICE
+  DRIVER
+  ANALYST
+}
+
+enum UserStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+}
+
+enum OrganizationTier {
+  PILOT
+  STANDARD
+  ENTERPRISE
+  GOVERNMENT
+}
+
+enum VehicleType {
+  SEDAN
+  SUV
+  BAKKIE
+  VAN
+  TRUCK
+  BUS
+  MOTORCYCLE
+  ARMOURED
+}
+
+enum VehicleStatus {
+  ACTIVE
+  IDLE
+  IN_TRANSIT
+  UNDER_THREAT
+  IMMOBILISED
+  STOLEN
+  RECOVERED
+  MAINTENANCE
+  DECOMMISSIONED
+}
+
+enum ProtectionMode {
+  PASSIVE
+  GUARDIAN
+  SENTINEL
+  ESCORT
+}
+
+enum DriverStatus {
+  ON_DUTY
+  OFF_DUTY
+  DRIVING
+  RESTING
+  DISTRESS
+  UNREACHABLE
+}
+
+enum IncidentType {
+  HIJACKING
+  ATTEMPTED_HIJACKING
+  THEFT
+  KIDNAPPING
+  COERCION
+  SMASH_AND_GRAB
+  UNAUTHORISED_USE
+  PANIC_ACTIVATION
+  GEOFENCE_BREACH
+  COLLISION
+  MEDICAL
+}
+
+enum IncidentSeverity {
+  INFO
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum IncidentStatus {
+  DETECTED
+  TRIAGED
+  ESCALATED
+  RESPONDING
+  CONTAINED
+  RESOLVED
+  FALSE_POSITIVE
+  ARCHIVED
+}
+
+enum EvidenceType {
+  VIDEO
+  AUDIO
+  IMAGE
+  TELEMETRY_SNAPSHOT
+  DOCUMENT
+  AI_INFERENCE
+  SYSTEM_LOG
+}
+
+enum EvidenceStatus {
+  PENDING_UPLOAD
+  UPLOADING
+  SEALED
+  VERIFIED
+  CORRUPTED
+  PURGED
+}
+
+enum AlertType {
+  PANIC
+  ANOMALY
+  PREDICTIVE_RISK
+  GEOFENCE
+  DEVICE_TAMPER
+  SIGNAL_LOSS
+  DRIVER_BEHAVIOUR
+  MAINTENANCE
+}
+
+enum AlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  SUPPRESSED
+  CLOSED
+}
+
+enum NotificationChannel {
+  IN_APP
+  PUSH
+  SMS
+  EMAIL
+  VOICE
+  WEBHOOK
+}
+
+enum NotificationStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+enum TelemetrySource {
+  OBD
+  GPS_TRACKER
+  DASHCAM
+  MOBILE_APP
+  CAN_BUS
+  SIMULATION
+}
+
+enum ThreatEventType {
+  HOTSPOT_ENTRY
+  KNOWN_OFFENDER_PROXIMITY
+  TAILING_DETECTED
+  ROUTE_DEVIATION
+  UNUSUAL_STOP
+  CROWD_FORMATION
+  WEAPON_DETECTED
+  DURESS_SPEECH
+  JAMMER_DETECTED
+}
+
+enum ThreatLevel {
+  MINIMAL
+  GUARDED
+  ELEVATED
+  HIGH
+  SEVERE
+}
+
+enum AuditAction {
+  CREATE
+  READ
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  LOGIN_FAILED
+  TOKEN_REFRESH
+  PERMISSION_DENIED
+  EXPORT
+  DISPATCH
+  IMMOBILISE
+}
+
+// ============================================================================
+// Tenancy and identity
+// ============================================================================
+
+model Organization {
+  id          String           @id @default(uuid()) @db.Uuid
+  name        String
+  slug        String           @unique
+  tier        OrganizationTier @default(PILOT)
+  countryCode String           @default("ZA") @db.Char(2)
+  timezone    String           @default("Africa/Johannesburg")
+  isActive    Boolean          @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users         User[]
+  vehicles      Vehicle[]
+  drivers       Driver[]
+  incidents     Incident[]
+  evidence      Evidence[]
+  alerts        Alert[]
+  telemetry     Telemetry[]
+  threatEvents  ThreatEvent[]
+  auditLogs     AuditLog[]
+
+  identityEnrolments  IdentityEnrolment[]
+  enrolledOccupants   EnrolledOccupant[]
+  identityAssessments IdentityAssessment[]
+  deviceFingerprints  DeviceFingerprint[]
+  behaviourBaselines  BehaviourBaseline[]
+
+  behaviourAssessments BehaviourAssessment[]
+  cabinBaselines       CabinBaseline[]
+  cabinSensors         CabinSensor[]
+  cabinDetections      CabinDetection[]
+  threatDecisions      ThreatDecision[]
+  safeHavens           SafeHaven[]
+  routePlans           RoutePlan[]
+  routingEquityRecords RoutingEquityRecord[]
+  policeRouteShares    PoliceRouteShare[]
+
+  @@index([isActive])
+  @@map("organizations")
+}
+
+model Role {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        RoleName @unique
+  displayName String
+  description String
+
+  /// Permission strings from packages/types `PERMISSIONS`. Stored denormalised
+  /// so a role's grant set can be read without a join on every request; the
+  /// seed reconciles this column against the RBAC matrix in @aegisdrive/shared.
+  permissions String[]
+
+  /// System roles cannot be renamed or deleted through the API.
+  isSystemRole Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users UserRole[]
+
+  @@map("roles")
+}
+
+model User {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+
+  email    String
+  /// Argon2id/bcrypt digest. Never selected into a DTO.
+  password String
+
+  firstName   String
+  lastName    String
+  phoneNumber String?
+  avatarUrl   String?
+
+  status      UserStatus @default(INVITED)
+  mfaEnabled  Boolean    @default(false)
+  mfaSecret   String?
+  lastLoginAt DateTime?
+
+  /// Reset to zero on success; drives lockout together with the Redis counter.
+  failedLoginCount Int       @default(0)
+  lockedUntil      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  roles         UserRole[]
+  sessions      Session[]
+  driverProfile Driver?
+  notifications Notification[]
+
+  assignedIncidents    Incident[] @relation("IncidentAssignee")
+  acknowledgedAlerts   Alert[]    @relation("AlertAcknowledger")
+  uploadedEvidence     Evidence[] @relation("EvidenceUploader")
+  auditLogs            AuditLog[]
+
+  /// Email is unique per tenant, not globally: the same responder may hold
+  /// accounts with two client organizations.
+  @@unique([organizationId, email])
+  @@index([organizationId, status])
+  @@index([email])
+  @@map("users")
+}
+
+model UserRole {
+  userId     String   @db.Uuid
+  roleId     String   @db.Uuid
+  assignedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+  @@map("user_roles")
+}
+
+/// One row per issued refresh token. Revoking a session invalidates the token
+/// family immediately, which a stateless JWT alone cannot do.
+model Session {
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+
+  /// SHA-256 of the refresh token. The raw token is never persisted, so a
+  /// database leak does not hand an attacker usable credentials.
+  refreshTokenHash String  @unique
+  userAgent        String?
+  ipAddress        String?
+
+  expiresAt DateTime
+  revokedAt DateTime?
+  /// Set when this session was rotated; detects refresh-token replay.
+  replacedById String? @db.Uuid
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+// ============================================================================
+// Fleet
+// ============================================================================
+
+model Vehicle {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+
+  registrationNumber String
+  vin                String
+  make               String
+  model              String
+  year               Int
+  colour             String
+
+  type           VehicleType
+  status         VehicleStatus  @default(IDLE)
+  protectionMode ProtectionMode @default(GUARDIAN)
+
+  /// 0-100 composite, written by the AI risk engine.
+  riskScore   Int         @default(0)
+  threatLevel ThreatLevel @default(MINIMAL)
+
+  /// Denormalised last-known position. The authoritative history is in Telemetry;
+  /// this column exists so the fleet map renders without a per-vehicle subquery.
+  lastLongitude Float?
+  lastLatitude  Float?
+  lastHeading   Float?
+  lastSpeedKph  Float?
+  lastSeenAt    DateTime?
+
+  odometerKm   Int     @default(0)
+  deviceSerial String?
+
+  assignedDriverId String? @unique @db.Uuid
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assignedDriver Driver?       @relation(fields: [assignedDriverId], references: [id], onDelete: SetNull)
+  incidents      Incident[]
+  evidence       Evidence[]
+  alerts         Alert[]
+  telemetry      Telemetry[]
+  threatEvents   ThreatEvent[]
+  identityAssessments IdentityAssessment[]
+
+  behaviourAssessments BehaviourAssessment[]
+  cabinSensors         CabinSensor[]
+  cabinDetections      CabinDetection[]
+  threatDecisions      ThreatDecision[]
+  routePlans           RoutePlan[]
+
+  @@unique([organizationId, registrationNumber])
+  @@unique([organizationId, vin])
+  @@index([organizationId, status])
+  @@index([organizationId, threatLevel])
+  @@index([deviceSerial])
+  @@map("vehicles")
+}
+
+model Driver {
+  id             String  @id @default(uuid()) @db.Uuid
+  organizationId String  @db.Uuid
+  /// Present once the driver has been given app credentials.
+  userId         String? @unique @db.Uuid
+
+  firstName        String
+  lastName         String
+  licenceNumber    String
+  licenceExpiresAt DateTime?
+  phoneNumber      String
+
+  status DriverStatus @default(OFF_DUTY)
+  /// 0-100 behavioural safety score. Higher is safer.
+  safetyScore Int @default(100)
+
+  emergencyContactName  String?
+  emergencyContactPhone String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user            User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  assignedVehicle Vehicle?
+  incidents       Incident[]
+  alerts          Alert[]
+
+  identityEnrolments  IdentityEnrolment[]
+  identityAssessments IdentityAssessment[]
+  identityChallenges  IdentityChallenge[]
+  deviceFingerprints  DeviceFingerprint[]
+  behaviourBaselines  BehaviourBaseline[]
+
+  behaviourAssessments BehaviourAssessment[]
+  cabinBaselines       CabinBaseline[]
+  threatDecisions      ThreatDecision[]
+  routePlans           RoutePlan[]
+
+  @@unique([organizationId, licenceNumber])
+  @@index([organizationId, status])
+  @@map("drivers")
+}
+
+// ============================================================================
+// Operations
+// ============================================================================
+
+model Incident {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+
+  /// Human-quotable reference, e.g. `INC-2026-000481`. Unique per tenant.
+  reference String
+
+  type     IncidentType
+  severity IncidentSeverity
+  status   IncidentStatus   @default(DETECTED)
+
+  title   String
+  summary String @db.Text
+
+  vehicleId String? @db.Uuid
+  driverId  String? @db.Uuid
+
+  longitude Float?
+  latitude  Float?
+
+  detectedAt     DateTime  @default(now())
+  acknowledgedAt DateTime?
+  resolvedAt     DateTime?
+
+  assignedToUserId String? @db.Uuid
+
+  /// 0-1 confidence from the model that raised this incident. Null when a human filed it.
+  aiConfidence Float?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  vehicle      Vehicle?     @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  driver       Driver?      @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  assignedTo   User?        @relation("IncidentAssignee", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+
+  evidence      Evidence[]
+  alerts        Alert[]
+  threatEvents  ThreatEvent[]
+  notifications Notification[]
+  timeline      IncidentTimelineEntry[]
+  policeRouteShares PoliceRouteShare[]
+
+  @@unique([organizationId, reference])
+  @@index([organizationId, status, severity])
+  @@index([organizationId, detectedAt])
+  @@index([vehicleId])
+  @@map("incidents")
+}
+
+/// Append-only narrative of an incident. Never updated or deleted — it is the
+/// operational record produced in evidence alongside the media itself.
+model IncidentTimelineEntry {
+  id         String @id @default(uuid()) @db.Uuid
+  incidentId String @db.Uuid
+
+  /// `STATUS_CHANGE`, `NOTE`, `DISPATCH`, `AI_INFERENCE`, `EVIDENCE_ADDED`.
+  kind        String
+  message     String   @db.Text
+  actorUserId String?  @db.Uuid
+  metadata    Json?
+  occurredAt  DateTime @default(now())
+
+  incident Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+
+  @@index([incidentId, occurredAt])
+  @@map("incident_timeline_entries")
+}
+
+model Evidence {
+  id             String  @id @default(uuid()) @db.Uuid
+  organizationId String  @db.Uuid
+  incidentId     String? @db.Uuid
+  vehicleId      String? @db.Uuid
+
+  type   EvidenceType
+  status EvidenceStatus @default(PENDING_UPLOAD)
+
+  label      String
+  /// Object-store key. The API never returns it directly; clients receive a
+  /// short-lived signed URL instead.
+  storageKey String
+  mimeType   String
+  sizeBytes  BigInt @default(0)
+
+  durationSeconds Int?
+
+  /// SHA-256 of the sealed object. Recomputed on every download and compared;
+  /// a mismatch flips the row to CORRUPTED and raises an alert.
+  checksum String
+
+  capturedAt DateTime
+  sealedAt   DateTime?
+
+  uploadedByUserId String? @db.Uuid
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  incident     Incident?    @relation(fields: [incidentId], references: [id], onDelete: SetNull)
+  vehicle      Vehicle?     @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  uploadedBy   User?        @relation("EvidenceUploader", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+
+  custodyEvents EvidenceCustodyEvent[]
+
+  @@index([organizationId, status])
+  @@index([incidentId])
+  @@index([checksum])
+  @@map("evidence")
+}
+
+/// Chain of custody. Append-only: every access, export and verification of a
+/// sealed artefact is recorded so the artefact remains admissible.
+model EvidenceCustodyEvent {
+  id         String @id @default(uuid()) @db.Uuid
+  evidenceId String @db.Uuid
+
+  /// `SEALED`, `ACCESSED`, `EXPORTED`, `VERIFIED`, `TRANSFERRED`.
+  action      String
+  actorUserId String?  @db.Uuid
+  actorEmail  String?
+  ipAddress   String?
+  notes       String?
+  occurredAt  DateTime @default(now())
+
+  evidence Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+
+  @@index([evidenceId, occurredAt])
+  @@map("evidence_custody_events")
+}
+
+model Alert {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+
+  type     AlertType
+  status   AlertStatus      @default(OPEN)
+  severity IncidentSeverity
+
+  title   String
+  message String @db.Text
+
+  vehicleId  String? @db.Uuid
+  driverId   String? @db.Uuid
+  incidentId String? @db.Uuid
+
+  raisedAt             DateTime  @default(now())
+  acknowledgedAt       DateTime?
+  acknowledgedByUserId String?   @db.Uuid
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  vehicle        Vehicle?       @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  driver         Driver?        @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  incident       Incident?      @relation(fields: [incidentId], references: [id], onDelete: SetNull)
+  acknowledgedBy User?          @relation("AlertAcknowledger", fields: [acknowledgedByUserId], references: [id], onDelete: SetNull)
+  notifications  Notification[]
+
+  @@index([organizationId, status, raisedAt])
+  @@index([vehicleId])
+  @@map("alerts")
+}
+
+model Notification {
+  id              String @id @default(uuid()) @db.Uuid
+  recipientUserId String @db.Uuid
+
+  channel NotificationChannel
+  status  NotificationStatus  @default(QUEUED)
+
+  subject String
+  body    String @db.Text
+
+  alertId    String? @db.Uuid
+  incidentId String? @db.Uuid
+
+  sentAt DateTime?
+  readAt DateTime?
+  /// Populated when `status` is FAILED; drives the retry policy.
+  failureReason String?
+  attemptCount  Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  recipient User      @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
+  alert     Alert?    @relation(fields: [alertId], references: [id], onDelete: SetNull)
+  incident  Incident? @relation(fields: [incidentId], references: [id], onDelete: SetNull)
+
+  @@index([recipientUserId, status, createdAt])
+  @@map("notifications")
+}
+
+// ============================================================================
+// Telemetry and intelligence
+// ============================================================================
+
+/// High-volume append-only stream. Partition or roll this table into aggregates
+/// beyond TELEMETRY_HOT_RETENTION_DAYS; the composite index is ordered for the
+/// "latest N points for one vehicle" query that dominates reads.
+model Telemetry {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  vehicleId      String @db.Uuid
+
+  source     TelemetrySource
+  recordedAt DateTime
+
+  longitude Float
+  latitude  Float
+  altitude  Float?
+  heading   Float?
+  speedKph  Float?
+  accuracy  Float?
+
+  ignitionOn        Boolean @default(false)
+  fuelLevelPercent  Float?
+  batteryVoltage    Float?
+  engineTempC       Float?
+  harshBraking      Boolean @default(false)
+  harshAcceleration Boolean @default(false)
+
+  /// Verbatim device payload, retained for forensic replay.
+  raw Json?
+
+  createdAt DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  vehicle      Vehicle      @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId, recordedAt(sort: Desc)])
+  @@index([organizationId, recordedAt(sort: Desc)])
+  @@map("telemetry")
+}
+
+model ThreatEvent {
+  id             String  @id @default(uuid()) @db.Uuid
+  organizationId String  @db.Uuid
+  vehicleId      String? @db.Uuid
+  incidentId     String? @db.Uuid
+
+  type  ThreatEventType
+  level ThreatLevel
+
+  longitude Float?
+  latitude  Float?
+
+  detectedAt DateTime @default(now())
+  /// 0-1 model confidence.
+  confidence Float
+  /// Producing model and version, e.g. `tailing-v3`. Required for auditability
+  /// of automated decisions.
+  modelId     String
+  description String  @db.Text
+
+  acknowledged Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  vehicle      Vehicle?     @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  incident     Incident?    @relation(fields: [incidentId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, detectedAt(sort: Desc)])
+  @@index([organizationId, level, acknowledged])
+  @@index([vehicleId])
+  @@map("threat_events")
+}
+
+/// Curated geographic risk areas. Fed by historical incidents and by external
+/// crime intelligence; consumed by the route-risk model.
+model ThreatZone {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String? @db.Uuid
+
+  name        String
+  description String?
+  level       ThreatLevel
+
+  centreLongitude Float
+  centreLatitude  Float
+  radiusMetres    Int
+
+  /// Zones can be time-bounded, e.g. a hotspot active only after dark.
+  activeFromHour Int? @db.SmallInt
+  activeToHour   Int? @db.SmallInt
+
+  isActive Boolean @default(true)
+  source   String  @default("INTERNAL")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId, isActive])
+  @@map("threat_zones")
+}
+
+// ============================================================================
+// Compliance
+// ============================================================================
+
+/// Append-only. Written on every mutation and every authorisation decision.
+/// Nothing in the API is permitted to update or delete rows in this table.
+model AuditLog {
+  id             String  @id @default(uuid()) @db.Uuid
+  organizationId String  @db.Uuid
+  actorUserId    String? @db.Uuid
+
+  action AuditAction
+  /// Denormalised so the record survives deletion of the user account.
+  actorEmail String?
+
+  resourceType String
+  resourceId   String?
+
+  ipAddress String?
+  userAgent String?
+  requestId String?
+
+  /// Before/after diff or request context.
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actor        User?        @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([organizationId, action])
+  @@index([resourceType, resourceId])
+  @@map("audit_logs")
+}
+
+// ============================================================================
+// Continuous Identity Engine
+// ============================================================================
+//
+// The rule governing every model below: RAW BIOMETRICS ARE NEVER STORED.
+//
+// A password can be rotated after a breach; a face cannot. What is persisted is
+// an irreversible template — a fixed-length embedding from which the original
+// sample cannot be reconstructed — encrypted under a per-tenant key held in the
+// KMS, never in this database. There is no column here that holds an image, an
+// audio clip, or anything from which one could be recovered.
+//
+// See docs/adr/0007-biometric-identity.md.
+
+enum IdentityModality {
+  FACE
+  VOICE
+  DEVICE
+  BEHAVIOUR
+  INTERACTION
+  EXPLICIT
+}
+
+enum EnrolmentStatus {
+  PENDING
+  CAPTURING
+  ACTIVE
+  WITHDRAWN
+  REVOKED
+  EXPIRED
+}
+
+enum ConsentBasis {
+  EXPLICIT_CONSENT
+  CONTRACT
+  VITAL_INTERESTS
+}
+
+enum IdentityBand {
+  VERIFIED
+  PROBABLE
+  UNCERTAIN
+  SUSPECT
+  IMPOSTOR
+}
+
+enum DeviceAttestation {
+  VERIFIED
+  UNVERIFIED
+  FAILED
+  UNSUPPORTED
+}
+
+/// An enrolled biometric template.
+///
+/// `templateRef` is a KMS-wrapped pointer into the template store, not the
+/// vector itself. A full dump of this table yields nothing usable without the
+/// tenant key, and that key is revocable — which is what makes an enrolment
+/// cancellable even though the underlying biometric is not.
+model IdentityEnrolment {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+
+  driverId   String? @db.Uuid
+  occupantId String? @db.Uuid
+
+  modality IdentityModality
+  status   EnrolmentStatus  @default(PENDING)
+
+  /// Opaque handle into the encrypted template store. Never the template.
+  templateRef String
+  /// Versioned model that produced it. A model upgrade needs re-enrolment.
+  modelId         String
+  templateVersion Int    @default(1)
+
+  sampleCount Int @default(0)
+  /// 0-1 mean sample quality. Gates whether the enrolment may be used at all.
+  enrolmentQuality Float @default(0)
+
+  /// Lawful basis. Required: processing biometrics without one is unlawful
+  /// under POPIA and GDPR regardless of how well the system performs.
+  consentBasis       ConsentBasis
+  consentRecordedAt  DateTime
+  consentWithdrawnAt DateTime?
+
+  /// Templates expire. Faces and voices drift, and indefinite retention of
+  /// biometric data is not defensible.
+  expiresAt      DateTime?
+  lastVerifiedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  driver       Driver?           @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  occupant     EnrolledOccupant? @relation(fields: [occupantId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@index([driverId, modality])
+  @@index([occupantId])
+  @@index([expiresAt])
+  @@map("identity_enrolments")
+}
+
+/// A non-driver occupant who has explicitly consented to recognition.
+///
+/// Consent is always explicit here and never contractual: a passenger has no
+/// employment relationship to imply a basis. An unenrolled passenger is counted
+/// but never identified.
+model EnrolledOccupant {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+
+  displayName  String
+  relationship String
+
+  consentBasis       ConsentBasis @default(EXPLICIT_CONSENT)
+  consentRecordedAt  DateTime
+  consentWithdrawnAt DateTime?
+
+  status EnrolmentStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  enrolments   IdentityEnrolment[]
+
+  @@index([organizationId, status])
+  @@map("enrolled_occupants")
+}
+
+/// A fused identity assessment.
+///
+/// `contributions` is stored, not recomputed. Calibration constants and the
+/// fusion policy both change over time, so reproducing a historical score from
+/// today's parameters would give a different answer — and this record may be
+/// produced in an investigation. `policyVersion` pins which rules applied.
+model IdentityAssessment {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+
+  driverId  String? @db.Uuid
+  vehicleId String? @db.Uuid
+
+  /// 0-100 driver confidence score.
+  confidence Int
+  band       IdentityBand
+  /// Fused LLR before mapping to a probability. Retained for audit.
+  fusedLogLikelihoodRatio Float
+
+  /// Per-modality breakdown. Required — an unexplainable score is unusable.
+  contributions     Json
+  missingModalities Json
+
+  spoofDetected Boolean @default(false)
+
+  /// Occupancy, when the cabin camera was available.
+  occupantCount       Int?
+  unrecognisedCount   Int?
+  expectedCount       Int?
+  unexpectedOccupancy Boolean @default(false)
+
+  assessedAt    DateTime @default(now())
+  policyVersion String
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  driver       Driver?      @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  vehicle      Vehicle?     @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+
+  challenges IdentityChallenge[]
+
+  @@index([organizationId, assessedAt(sort: Desc)])
+  @@index([driverId, assessedAt(sort: Desc)])
+  @@index([organizationId, band])
+  @@map("identity_assessments")
+}
+
+/// A request to the driver to re-establish identity explicitly.
+///
+/// A challenge is a signal, never a gate. A driver being hijacked may be
+/// physically unable to answer, so a failed or ignored challenge must never be
+/// treated as proof of anything on its own.
+model IdentityChallenge {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  driverId       String @db.Uuid
+  assessmentId   String @db.Uuid
+
+  /// `PIN`, `DEVICE_BIOMETRIC`, `VOICE_PHRASE`, `CONTROL_ROOM_CALL`.
+  method String
+  /// `PENDING`, `PASSED`, `FAILED`, `EXPIRED`, `DECLINED`.
+  status String @default("PENDING")
+
+  issuedAt    DateTime  @default(now())
+  respondedAt DateTime?
+  expiresAt   DateTime
+
+  driver     Driver             @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  assessment IdentityAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@index([driverId, issuedAt(sort: Desc)])
+  @@map("identity_challenges")
+}
+
+/// Device attestation.
+///
+/// Not biometric, and the strongest single signal available: the phone is
+/// physically present and the OS will vouch for its integrity. Every column is
+/// a stable hardware or OS property — nothing derived from browsing, contacts
+/// or installed apps.
+model DeviceFingerprint {
+  id             String  @id @default(uuid()) @db.Uuid
+  organizationId String  @db.Uuid
+  driverId       String? @db.Uuid
+
+  /// Stable per-install identifier. Rotates on reinstall, which is detected.
+  installationId String
+  /// SHA-256 over the stable attribute set. The comparison key.
+  fingerprintHash String
+
+  platform     String
+  osVersion    String
+  deviceModel  String
+  manufacturer String
+
+  attestation DeviceAttestation @default(UNSUPPORTED)
+  /// Root or jailbreak detected. Downgrades every signal from this device.
+  compromised Boolean @default(false)
+  /// Emulator. In this product that is effectively always an attack.
+  emulated Boolean @default(false)
+
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+  /// Trusted only after a probation period with no anomalies.
+  trusted Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  driver       Driver?      @relation(fields: [driverId], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, installationId])
+  @@index([organizationId, driverId])
+  @@index([fingerprintHash])
+  @@map("device_fingerprints")
+}
+
+/// A driver's behavioural baseline.
+///
+/// Summary statistics only. No route history, no destinations, no per-trip
+/// timestamps — a baseline holding those would be a movement-tracking database
+/// wearing an identity badge.
+model BehaviourBaseline {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  driverId       String @db.Uuid
+
+  modelId String
+
+  tripCount       Int @default(0)
+  observedMinutes Int @default(0)
+
+  /// Feature name to { mean, standardDeviation }.
+  features Json
+
+  /// 0-1. A generic driving profile discriminates poorly and is flagged as such.
+  distinctiveness Float @default(0)
+
+  status EnrolmentStatus @default(PENDING)
+
+  lastUpdatedAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  driver       Driver       @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@unique([driverId, modelId])
+  @@index([organizationId, status])
+  @@map("behaviour_baselines")
+}
+
+// ============================================================================
+// Behaviour Intelligence Engine
+// ============================================================================
+//
+// Answers a different question from the identity models above. Identity asks
+// *who is driving*; this asks WHAT IS HAPPENING TO THE PEOPLE IN THE CABIN.
+//
+// Three rules govern every model below.
+//
+// 1. NO EMOTION IS RECORDED. There is no column here for fear, anger, stress or
+//    any other affective state. Facial and vocal configurations do not map
+//    reliably onto emotions across people and contexts, so such a column would
+//    be a confident lie in a product that dispatches armed responders.
+//    What is stored are physical measurements and their departure from the
+//    subject's own baseline.
+//
+// 2. NO RAW SAMPLE IS STORED. No frames, no audio, no keypoint series. A
+//    retained keypoint series is a record of how a named worker's body moved
+//    across months of their job — more invasive than the video it came from,
+//    and nobody would think to look for it in a database.
+//
+// 3. NOT FOR PERFORMANCE MANAGEMENT. The lawful basis is the safety of the data
+//    subject. These rows must never feed a driver scorecard; doing so forfeits
+//    that basis and is a prohibited practice under the EU AI Act.
+//
+// See docs/adr/0008-behaviour-intelligence.md.
+
+/// A fused behaviour assessment and its threat score.
+///
+/// Append-only, like `IdentityAssessment`, and for the same reason: this is a
+/// record of what the system concluded at a moment in time and it may be
+/// produced in an investigation. There is no update path and there must not be
+/// one.
+///
+/// Written for every evaluation, including the quiet ones. A gap in the record
+/// is indistinguishable from the engine having been switched off.
+model BehaviourAssessment {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+
+  driverId  String? @db.Uuid
+  vehicleId String? @db.Uuid
+
+  /// 0-100 evidence strength. Drives the band and the response.
+  threatScore Int
+  threatLevel ThreatLevel
+
+  /// Calibrated probability that the event is genuine, given the base rate.
+  ///
+  /// Stored alongside the score and always displayed with it. Against a base
+  /// rate near one event per 200,000 trip-hours, evidence scoring 80 can still
+  /// be wrong four times in five. An operator shown only the score dispatches
+  /// armed responders; one shown both sends someone to look.
+  positivePredictiveValue Float
+  /// The base rate the PPV was computed against. Recorded because it is a
+  /// choice, and a different fleet profile makes the same evidence mean
+  /// something different.
+  baseRatePerTripHour Float
+  /// Combined evidence, log10. The score is a display mapping of this.
+  logLikelihoodRatio Float
+
+  /// Per-item breakdown. Required — an unexplainable score is unusable.
+  contributions Json
+  /// Evidence classes that contributed. Corroboration is counted from this.
+  corroboratingClasses Json
+  /// True when the score was held down because all evidence came from one class.
+  corroborationCapped Boolean @default(false)
+  capReason           String?
+
+  /// Composite physical-activity index, 0-1. NOT an emotion or a stress level.
+  arousalIndex      Float?
+  arousalConfidence Float?
+  /// 0-1 departure from this driver's own behavioural normal.
+  abnormalityScore Float?
+
+  /// Cabin composition at assessment time. Counts only; nobody is identified.
+  occupantCount Int?
+  expectedCount Int?
+  /// Distinct voices detected. Counted, never identified.
+  speakerCount Int?
+
+  /// The identity band at scoring time, when one was available.
+  identityBand IdentityBand?
+
+  /// Signals that fired, as a `BehaviourObservation[]`. Derived measurements
+  /// only — never the frames or audio they came from.
+  signals Json
+
+  /// Suspected coercion. Handled covertly: nothing is ever surfaced to the
+  /// vehicle, because an attacker who sees the system react knows the driver
+  /// triggered something, and the driver pays for that.
+  duressIndicated  Boolean @default(false)
+  duressConfidence Float?
+  /// True when the driver deliberately signalled — phrase, PIN or gesture.
+  duressDeliberate Boolean @default(false)
+  duressBasis      Json?
+
+  assessedAt    DateTime @default(now())
+  policyVersion String
+  /// Which calibration set produced this score. Assessments must never be
+  /// silently made against unfitted numbers.
+  calibrationSource String
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  driver       Driver?      @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  vehicle      Vehicle?     @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, assessedAt(sort: Desc)])
+  @@index([driverId, assessedAt(sort: Desc)])
+  @@index([organizationId, threatLevel])
+  @@index([organizationId, duressIndicated])
+  @@map("behaviour_assessments")
+}
+
+/// A driver's cabin-behaviour baseline.
+///
+/// Separate from `BehaviourBaseline` above, and the separation is deliberate
+/// rather than duplication. That one holds *driving style* features used to tell
+/// one person from another; this holds *cabin state* features used to tell one
+/// person's ordinary day from their worst one. Merging them would let identity
+/// features leak into duress scoring, where a driver simply being unlike their
+/// usual self would start reading as a threat.
+///
+/// Summary statistics only, maintained by Welford's online algorithm so that raw
+/// windows can be discarded the moment they are folded in. No frames, no audio,
+/// no keypoints, no locations, no times of day.
+model CabinBaseline {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  driverId       String @db.Uuid
+
+  modelId String
+
+  windowCount     Int @default(0)
+  observedMinutes Int @default(0)
+
+  /// Feature name to { mean, standardDeviation, m2 }.
+  features Json
+
+  /// Baselines expire. A person's ordinary changes — new route, new vehicle, a
+  /// healed injury — and a stale baseline does not fail safe: it reads ordinary
+  /// change as anomaly, which here means suspecting someone of being hijacked
+  /// because they changed cars.
+  expiresAt DateTime?
+
+  status EnrolmentStatus @default(PENDING)
+
+  lastUpdatedAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  driver       Driver       @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@unique([driverId, modelId])
+  @@index([organizationId, status])
+  @@index([expiresAt])
+  @@map("cabin_baselines")
+}
+
+// ============================================================================
+// Cabin Intelligence Engine
+// ============================================================================
+//
+// The perception layer. Everything above consumes signals; these models record
+// where signals came from.
+//
+// Three rules govern every model below.
+//
+// 1. NO FRAME OR AUDIO IS STORED HERE. Cabin sensors point at workers for an
+//    entire shift. What persists is a detection — a class, a confidence, a box —
+//    never the pixels. Media reaches durable storage only when an incident is
+//    opened, through Evidence, where it inherits a retention clock and a chain
+//    of custody.
+//
+// 2. NO DETECTION IDENTIFIES ANYONE. Occupants are counted; seats are tracked
+//    by position. There is no embedding column, no demographic column, and no
+//    per-occupant record across trips.
+//
+// 3. AMBIGUITY IS STORED, NOT RESOLVED. `alternatives` is a required column on
+//    a detection, because an operator reviewing a weapon call must see that the
+//    model was choosing between a handgun and a mobile phone.
+//
+// See docs/adr/0009-cabin-intelligence.md.
+
+enum CameraPlacement {
+  DRIVER_FACING
+  CABIN_WIDE
+  REAR_CABIN
+  CARGO
+}
+
+enum SensorHealth {
+  HEALTHY
+  DEGRADED
+  IMPAIRED
+  OFFLINE
+  UNKNOWN
+}
+
+enum TamperState {
+  CLEAR
+  OBSTRUCTED
+  BLINDED
+  MISALIGNED
+  DISCONNECTED
+}
+
+enum WeaponVerdict {
+  CONFIRMED
+  REJECTED
+}
+
+/// A cabin sensor enrolled against a vehicle.
+///
+/// `recordingIndicatorFitted` has no default and the service refuses enrolment
+/// without it. Workers under continuous camera observation must know the camera
+/// is there, and an unmarked installation would otherwise be discovered only at
+/// audit — by which point months of footage exist that nobody was told about.
+///
+/// The indicator must be constantly illuminated whenever the device is powered,
+/// never driven by detection state: a light that changes when the engine
+/// notices something warns an attacker in front of the driver it is protecting.
+model CabinSensor {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  vehicleId      String @db.Uuid
+
+  /// Stable hardware serial. The enrolment key.
+  serialNumber String
+  label        String
+  placement    CameraPlacement
+  /// True for a microphone-only device; `placement` is then advisory.
+  audioOnly Boolean @default(false)
+
+  health SensorHealth @default(UNKNOWN)
+  tamper TamperState  @default(CLEAR)
+  /// 0-1 rolling mean frame quality. Gates whether analysis runs at all.
+  meanQuality Float @default(0)
+
+  analysisEnabled          Boolean @default(true)
+  /// Required. Enrolment is refused when false.
+  recordingIndicatorFitted Boolean
+
+  firmwareVersion String
+  lastFrameAt     DateTime?
+  lastSeenAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  vehicle      Vehicle      @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  detections CabinDetection[]
+
+  @@unique([organizationId, serialNumber])
+  @@index([organizationId, vehicleId])
+  @@index([organizationId, health])
+  @@map("cabin_sensors")
+}
+
+/// A recorded cabin detection window.
+///
+/// Append-only, like the identity and behaviour assessments, and for the same
+/// reason: this is a record of what a sensor reported at a moment in time and
+/// it may be produced in an investigation.
+///
+/// The exception is `weaponVerdict` and its two companions, which an operator
+/// sets exactly once when they review the frames. That is not mutation of the
+/// detection — the detection is unchanged — it is the human judgement recorded
+/// alongside it, which is the entire point of requiring one.
+model CabinDetection {
+  id             String  @id @default(uuid()) @db.Uuid
+  organizationId String  @db.Uuid
+  vehicleId      String  @db.Uuid
+  sensorId       String? @db.Uuid
+
+  /// `ObjectDetection[]` as detected, each with its ambiguity set. Never pixels.
+  objects Json
+
+  /// Occupancy at the end of the window. Counts only; nobody is identified.
+  occupantCount   Int?
+  stableCount     Int?
+  expectedCount   Int?
+  /// `SeatOccupancy[]`. Positional, never identifying.
+  seats           Json?
+  /// Seat positions no sensor could resolve. Not the same as empty.
+  unobservedSeats Json?
+
+  /// `AcousticEvent[]` — spectral events, never speech content.
+  acousticEvents Json?
+
+  /// Weapon candidate, when one cleared the reporting floor.
+  weaponCandidateClass String?
+  weaponConfidence     Float?
+  /// Posterior that a weapon is genuinely present, given the base rate. Stored
+  /// alongside the confidence and always displayed with it — they differ by two
+  /// orders of magnitude and showing only the first produces false certainty.
+  weaponPpv          Float?
+  weaponBaseRate     Float?
+  /// Why the detection should be doubted. Never empty when a candidate exists.
+  weaponCaveats      Json?
+  weaponCorroborated Boolean @default(false)
+
+  /// The human review. A weapon detection is never a finding of fact without one.
+  weaponVerdict      WeaponVerdict?
+  weaponVerifiedById String?        @db.Uuid
+  weaponVerifiedAt   DateTime?
+
+  /// Sensors that could not contribute, and why.
+  degradedSensors Json?
+
+  windowSeconds   Int
+  capturedAt      DateTime @default(now())
+  pipelineVersion String
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  vehicle      Vehicle      @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  sensor       CabinSensor? @relation(fields: [sensorId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, capturedAt(sort: Desc)])
+  @@index([vehicleId, capturedAt(sort: Desc)])
+  @@index([organizationId, weaponVerdict])
+  @@map("cabin_detections")
+}
+
+// ============================================================================
+// Threat Decision Engine
+// ============================================================================
+//
+// The layer that decides *what is happening*, as opposed to how alarming it
+// looks. Everything above scores; this discriminates between explanations.
+//
+// Append-only. A decision record may be produced in an investigation —
+// including one into whether the response it recommended was justified — and a
+// mutable one is worth nothing there. The single exception is the override
+// block, which records a human disagreeing and is written once.
+//
+// See docs/adr/0010-threat-decision-engine.md.
+
+enum ThreatHypothesis {
+  NORMAL
+  SENSOR_FAILURE
+  UNAUTHORISED_USE
+  COLLISION
+  HIJACKING
+  THEFT
+  MEDICAL
+  DURESS
+}
+
+/// One decision, with the reasoning that produced it.
+model ThreatDecision {
+  id             String  @id @default(uuid()) @db.Uuid
+  organizationId String  @db.Uuid
+  vehicleId      String? @db.Uuid
+  driverId       String? @db.Uuid
+
+  /// The best non-normal explanation. NORMAL when nothing rose above the floor.
+  leadingHypothesis ThreatHypothesis
+
+  /// 1 - P(NORMAL). How likely it is that anything is wrong at all.
+  ///
+  /// Small on almost every trip and honestly so. This is what the notify and
+  /// incident thresholds are compared against, and those thresholds are
+  /// cost-weighted rather than probability-weighted: a phone call about a
+  /// possible stroke is worth making at 0.05%, an armed dispatch is not.
+  anomalyProbability Float
+  /// P(leading | evidence, not NORMAL). How clearly this explanation won.
+  hypothesisConfidence Float
+
+  /// Full distribution, absolute and conditional. Never truncated — the
+  /// hypotheses that lost are how a reviewer sees what else was on the table.
+  posteriors Json
+
+  /// Epistemic confidence: how good the evidence base was, which is a different
+  /// question from how likely the explanation is. Both are stored because
+  /// "we are sure nothing is wrong" and "we cannot see" must not render alike.
+  confidenceOverall  Float
+  confidenceDetail   Json
+
+  actions       Json
+  autonomyLevel String
+  severity      IncidentSeverity
+
+  /// Rules that blocked an action. Empty is common and meaningful; a populated
+  /// list is how the record shows what was considered and declined.
+  constraints Json
+
+  /// The reasoning as a traversable DAG: evidence, priors, every hypothesis,
+  /// the constraints and the decision.
+  graph       Json
+  explanation Json
+
+  /// Enough to replay the decision exactly. A decision that cannot be
+  /// reproduced from its record cannot be defended.
+  inputs Json
+
+  decidedAt         DateTime @default(now())
+  engineVersion     String
+  calibrationSource String
+
+  /// A human disagreeing with the engine. Written once.
+  ///
+  /// First-class data rather than an audit-log side effect, because
+  /// disagreement is the most valuable calibration signal the platform can
+  /// collect — an engine routinely overridden on one hypothesis is
+  /// miscalibrated in a way no offline evaluation will show.
+  overrideHypothesis ThreatHypothesis?
+  overrideReason     String?
+  overrideByUserId   String?           @db.Uuid
+  overrideAt         DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  vehicle      Vehicle?     @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  driver       Driver?      @relation(fields: [driverId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, decidedAt(sort: Desc)])
+  @@index([vehicleId, decidedAt(sort: Desc)])
+  @@index([organizationId, leadingHypothesis])
+  @@index([organizationId, overrideHypothesis])
+  @@map("threat_decisions")
+}
+
+// ============================================================================
+// SafeCorridor AI
+// ============================================================================
+//
+// The preventive half of the product: route a vehicle along a path whose risk
+// is understood, rather than reacting after a hijacking.
+//
+// Four rules govern the models below, and they exist because crime-avoidance
+// routing is redlining unless it is built against them.
+//
+// 1. HAZARD ATTACHES TO ROAD SEGMENTS IN TIME WINDOWS, NEVER TO AREAS. There is
+//    no suburb, district or area-type column anywhere here, and nothing from
+//    which one could be derived and grouped on. "This offramp between 18:00 and
+//    21:00" is operationally precise and redlines nobody.
+//
+// 2. A DESTINATION IS NEVER AVOIDED. Avoidance applies to through-traffic only.
+//    No model here can mark a place unreachable.
+//
+// 3. THE PLATFORM'S OWN ALERTS ARE NOT A HAZARD SOURCE. Only human-confirmed
+//    incidents are. Flagging a segment raises monitoring there, which raises
+//    detections, which raises the flag - that loop manufactures the pattern it
+//    claims to find.
+//
+// 4. THE DETOUR COST IS COUNTED. RoutingEquityRecord exists so that systematic
+//    under-service of a destination shows up as a number somebody reviews,
+//    rather than as a slow drift nobody decided on.
+//
+// See docs/adr/0011-safecorridor-routing.md.
+
+enum HazardSource {
+  CONFIRMED_INCIDENT
+  POLICE_STATISTICS
+  PARTNER_FEED
+  ROAD_AUTHORITY
+  MANUAL_ASSESSMENT
+}
+
+enum SafeHavenKind {
+  POLICE_STATION
+  HOSPITAL
+  FUEL_STATION
+  SECURITY_BASE
+  OWN_PREMISES
+  PUBLIC_SECURE_SITE
+}
+
+enum RiskAversion {
+  LOW
+  STANDARD
+  HIGH
+}
+
+/// A stretch of road, identified by a stable external reference.
+model RoadSegment {
+  id             String  @id @default(uuid()) @db.Uuid
+  organizationId String? @db.Uuid
+
+  /// Stable external identifier, e.g. `osm:way/12345`.
+  externalRef String
+  label       String
+
+  /// Ordered polyline as GeoJSON coordinates. PostGIS is deferred with the map.
+  geometry     Json
+  lengthMetres Int
+  /// Free-flow travel time. The denominator for congestion.
+  freeFlowSeconds Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  hazards SegmentHazard[]
+
+  @@unique([externalRef])
+  @@index([organizationId])
+  @@map("road_segments")
+}
+
+/// How dangerous a segment is, as an incident rate.
+///
+/// A rate rather than a score, because rates multiply by time to give expected
+/// incidents, which sum along a route and trade off directly against minutes. A
+/// unitless score supports none of those operations.
+model SegmentHazard {
+  id             String  @id @default(uuid()) @db.Uuid
+  organizationId String? @db.Uuid
+  segmentId      String  @db.Uuid
+
+  incidentType IncidentType
+
+  /// Incidents per million vehicle-hours. Millions because the raw figure is
+  /// otherwise a string of leading zeros nobody can eyeball.
+  ratePerMillionVehicleHours Float
+
+  /// Hour-of-day window, 0-23. Null means all day. Windows may wrap midnight -
+  /// most hijacking hotspots run 18:00 to 02:00.
+  activeFromHour Int? @db.SmallInt
+  activeToHour   Int? @db.SmallInt
+
+  /// 0-1. Falls with thin observation counts, thin exposure, and biased
+  /// sources. Below the policy floor a hazard does not influence routing at all.
+  confidence       Float
+  observationCount Int   @default(0)
+  /// Vehicle-hours the rate was computed against. Without it a rate is
+  /// arithmetically enormous and epistemically worthless.
+  exposureVehicleHours Float @default(0)
+
+  source HazardSource
+  /// True for sources measuring reporting and policing intensity as much as
+  /// crime. Handled by lowering confidence, never by scaling the rate - the
+  /// size of the bias is unknown and inventing a correction would substitute a
+  /// fabricated number for an honest admission that the figure is soft.
+  reportingBiasPossible Boolean @default(false)
+
+  validFrom      DateTime
+  validUntil     DateTime?
+  lastComputedAt DateTime  @default(now())
+
+  segment RoadSegment @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+
+  @@index([segmentId, incidentType])
+  @@index([organizationId, confidence])
+  @@map("segment_hazards")
+}
+
+/// Somewhere a driver can stop when something is wrong.
+///
+/// A refuge during an incident - never a filter on where a vehicle may be sent.
+/// Conflating the two is how a safety feature becomes a service exclusion.
+model SafeHaven {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+
+  kind    SafeHavenKind
+  name    String
+  address String
+
+  longitude Float
+  latitude  Float
+
+  isTwentyFourHour Boolean @default(false)
+  openFromHour     Int?    @db.SmallInt
+  openToHour       Int?    @db.SmallInt
+
+  hasArmedSecurity       Boolean @default(false)
+  hasCctv                Boolean @default(false)
+  hasLighting            Boolean @default(false)
+  hasStandingArrangement Boolean @default(false)
+
+  contactNumber String?
+  /// When someone last confirmed this place still exists and still qualifies.
+  /// A driver sent to a forecourt that closed six months ago is worse off than
+  /// one who kept driving, because they arrive believing they are safe.
+  lastVerifiedAt DateTime?
+  isActive       Boolean   @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, isActive])
+  @@index([organizationId, kind])
+  @@map("safe_havens")
+}
+
+/// A costed, chosen route and the alternatives it beat.
+///
+/// Persisted because a route that put a driver somewhere may be examined later,
+/// and "the router chose it" is not an answer. The rejected candidates are kept
+/// for the same reason the decision engine keeps its losing hypotheses.
+model RoutePlan {
+  id             String  @id @default(uuid()) @db.Uuid
+  organizationId String  @db.Uuid
+  vehicleId      String? @db.Uuid
+  driverId       String? @db.Uuid
+
+  /// The chosen RouteCandidate, with its legs and per-leg exposure.
+  chosen Json
+  /// Alternatives considered, including the fastest. The counterfactual.
+  rejected Json
+
+  totalTransitSeconds Int
+  /// Summed hazard rate times time-on-segment. Around 1e-5 on an urban trip -
+  /// displayed as a comparison against the alternative, never as a bare figure.
+  expectedIncidents Float
+  /// Extra travel time against the fastest candidate.
+  detourSeconds Int   @default(0)
+  riskReduction Float @default(0)
+
+  riskAversion RiskAversion @default(STANDARD)
+  /// Minutes-per-incident trade-off in force. Recorded so a route can be
+  /// defended afterwards - changing this value changes which routes are chosen.
+  riskAversionMinutesPerIncident Int
+
+  rationale   Json
+  /// Constraints that bounded the choice, e.g. the detour cap biting.
+  constraints Json
+
+  plannedAt DateTime @default(now())
+  departAt  DateTime
+
+  engineVersion           String
+  hazardCalibrationSource String
+  /// Which road-graph provider produced the candidate paths.
+  providerId String
+
+  supersededByPlanId String?  @db.Uuid
+  supersededReason   String?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  vehicle      Vehicle?     @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  driver       Driver?      @relation(fields: [driverId], references: [id], onDelete: SetNull)
+
+  equityRecord RoutingEquityRecord?
+  policeShares PoliceRouteShare[]
+
+  @@index([organizationId, plannedAt(sort: Desc)])
+  @@index([vehicleId, plannedAt(sort: Desc)])
+  @@map("route_plans")
+}
+
+/// What the router's risk avoidance cost, per trip.
+///
+/// The harm from crime-avoidance routing is invisible from inside the system
+/// that causes it - each detour looks reasonable, and only the aggregate shows
+/// that certain destinations consistently cost more. So the router keeps score
+/// against itself.
+///
+/// `destinationCell` is a coarse grid reference, roughly 5 km, and deliberately
+/// not a suburb name: fine enough to detect a district being underserved,
+/// coarse enough that a cell is a neighbourhood rather than a customer, and
+/// without the social meaning that would invite reading the report as a list of
+/// "bad areas".
+model RoutingEquityRecord {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  routePlanId    String @unique @db.Uuid
+
+  destinationCell String
+  /// Fastest-route time. The counterfactual.
+  baselineSeconds Int
+  chosenSeconds   Int
+  /// The difference. The number that matters.
+  detourSecondsAttributable Int
+  riskReduction             Float
+
+  recordedAt DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  routePlan    RoutePlan    @relation(fields: [routePlanId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, destinationCell])
+  @@index([organizationId, recordedAt(sort: Desc)])
+  @@map("routing_equity_records")
+}
+
+/// A time-bounded grant of route visibility to law enforcement.
+///
+/// A grant, never a feed. Continuous location sharing of a worker with the
+/// police is surveillance with an extra step - the driver is an employee going
+/// about their job and most of the time there is nothing to see.
+///
+/// So: scoped to one incident (required, not nullable), bounded in time
+/// (`expiresAt` has no null), revocable and audited. There is no model here for
+/// a standing police subscription, and adding one would be the change to argue
+/// about.
+model PoliceRouteShare {
+  id             String  @id @default(uuid()) @db.Uuid
+  organizationId String  @db.Uuid
+  /// Required. There is no incident-free sharing.
+  incidentId  String  @db.Uuid
+  vehicleId   String  @db.Uuid
+  routePlanId String? @db.Uuid
+
+  /// The receiving unit or station, as identified by the granting operator.
+  recipientReference String
+  /// Written justification. Required, and audited.
+  justification String
+
+  grantedByUserId String   @db.Uuid
+  grantedAt       DateTime @default(now())
+  /// Hard expiry. A grant cannot be open-ended.
+  expiresAt DateTime
+
+  revokedAt       DateTime?
+  revokedByUserId String?   @db.Uuid
+
+  /// Every resolution of the grant, for the audit trail.
+  accessCount    Int       @default(0)
+  lastAccessedAt DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  incident     Incident     @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  routePlan    RoutePlan?   @relation(fields: [routePlanId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, expiresAt])
+  @@index([incidentId])
+  @@index([vehicleId, grantedAt(sort: Desc)])
+  @@map("police_route_shares")
+}

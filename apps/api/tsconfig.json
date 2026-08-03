@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "incremental": true,
+    "tsBuildInfoFile": ".tsbuildinfo",
+    "noEmit": true,
+    "lib": ["es2023"],
+    "target": "es2023",
+    "resolveJsonModule": true,
+    "types": ["node"],
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["src", "prisma"],
+  "references": [{ "path": "../../packages/types" }, { "path": "../../packages/shared" }]
+}

@@ -1,0 +1,16 @@
+{
+  "name": "@aegisdrive/types",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Framework-agnostic domain types, enums and contracts shared across AEGISDRIVE AI.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./enums": "./src/enums.ts",
+    "./auth": "./src/auth.ts",
+    "./realtime": "./src/realtime.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}

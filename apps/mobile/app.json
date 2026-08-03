@@ -1,0 +1,94 @@
+{
+  "expo": {
+    "name": "AEGISDRIVE",
+    "slug": "aegisdrive",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "aegisdrive",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "backgroundColor": "#04060B",
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "ai.aegisdrive.app",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "UIBackgroundModes": ["location", "audio", "fetch", "remote-notification"],
+        "NSLocationWhenInUseUsageDescription": "AEGISDRIVE uses your location to protect your vehicle and dispatch help to you during an incident.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "AEGISDRIVE tracks your route in the background so protection continues when your screen is off. Without this, a hijacking cannot be located.",
+        "NSMicrophoneUsageDescription": "The microphone is used for the voice duress trigger and to capture audio evidence during an active incident.",
+        "NSCameraUsageDescription": "The camera captures evidence during an incident and when you attach it to a report.",
+        "NSMotionUsageDescription": "Motion data powers the covert shake activation, so you can raise an alarm without looking at your phone.",
+        "NSFaceIDUsageDescription": "Face ID unlocks the app without exposing your credentials on screen.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "ai.aegisdrive.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#04060B"
+      },
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
+        "FOREGROUND_SERVICE_MICROPHONE",
+        "POST_NOTIFICATIONS",
+        "RECORD_AUDIO",
+        "CAMERA",
+        "VIBRATE",
+        "WAKE_LOCK",
+        "HIGH_SAMPLING_RATE_SENSORS",
+        "ACCESS_NETWORK_STATE"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-sqlite",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "AEGISDRIVE tracks your route in the background so protection continues when your screen is off.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "AEGISDRIVE captures evidence during an incident.",
+          "microphonePermission": "AEGISDRIVE records audio evidence and listens for your duress phrase.",
+          "recordAudioAndroid": true
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#2E8BFF"
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#04060B",
+          "resizeMode": "contain"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "00000000-0000-0000-0000-000000000000"
+      }
+    }
+  }
+}

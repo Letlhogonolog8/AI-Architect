@@ -1,0 +1,10 @@
+node_modules
+dist
+build
+coverage
+.expo
+pnpm-lock.yaml
+**/*.tsbuildinfo
+lib/api-client-react/src/generated
+lib/api-zod/src/generated
+apps/api/prisma/migrations

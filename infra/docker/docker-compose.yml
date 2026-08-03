@@ -1,0 +1,149 @@
+# AEGISDRIVE AI — local development stack.
+#
+#   docker compose -f infra/docker/docker-compose.yml up -d
+#
+# Datastores only by default. The API and web client run on the host under
+# `pnpm dev` so that hot reload works; bring up the `full` profile to run
+# everything in containers the way production does.
+
+name: aegisdrive
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: aegis
+      POSTGRES_PASSWORD: aegis
+      POSTGRES_DB: aegisdrive
+      # Faster than the default and safe here: this data is disposable.
+      POSTGRES_INITDB_ARGS: '--auth-host=scram-sha-256'
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U aegis -d aegisdrive']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    command:
+      # Telemetry is write-heavy; these make local load behave a little more
+      # like production without needing a tuned instance.
+      - postgres
+      - -c
+      - max_connections=200
+      - -c
+      - shared_buffers=256MB
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    # appendonly keeps sessions and rate-limit counters across a restart, which
+    # avoids logging everyone out every time the stack is recycled.
+    command: ['redis-server', '--appendonly', 'yes', '--maxmemory-policy', 'noeviction']
+
+  api:
+    profiles: ['full']
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgresql://aegis:aegis@postgres:5432/aegisdrive?schema=public
+      REDIS_URL: redis://redis:6379
+      # Development-only values. Production secrets come from the orchestrator's
+      # secret store, never from a compose file.
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?set JWT_ACCESS_SECRET in your shell or .env}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?set JWT_REFRESH_SECRET in your shell or .env}
+      CORS_ORIGINS: http://localhost:8080
+    ports:
+      - '4000:4000'
+
+  web:
+    profiles: ['full']
+    build:
+      context: ../..
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - '8080:8080'
+
+  notifications:
+    profiles: ['full', 'workers']
+    build:
+      context: ../..
+      dockerfile: infra/docker/worker.Dockerfile
+      args:
+        SERVICE_NAME: notifications
+        SERVICE_PACKAGE: '@aegisdrive/notifications-service'
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://aegis:aegis@postgres:5432/aegisdrive?schema=public
+      REDIS_URL: redis://redis:6379
+
+  telemetry:
+    profiles: ['full', 'workers']
+    build:
+      context: ../..
+      dockerfile: infra/docker/worker.Dockerfile
+      args:
+        SERVICE_NAME: telemetry
+        SERVICE_PACKAGE: '@aegisdrive/telemetry-service'
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://aegis:aegis@postgres:5432/aegisdrive?schema=public
+      REDIS_URL: redis://redis:6379
+
+  evidence:
+    profiles: ['full', 'workers']
+    build:
+      context: ../..
+      dockerfile: infra/docker/worker.Dockerfile
+      args:
+        SERVICE_NAME: evidence
+        SERVICE_PACKAGE: '@aegisdrive/evidence-service'
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://aegis:aegis@postgres:5432/aegisdrive?schema=public
+      REDIS_URL: redis://redis:6379
+
+volumes:
+  postgres-data:
+  redis-data:

@@ -1,0 +1,261 @@
+/*
+ * AEGISDRIVE AI — design system theme.
+ *
+ * Tailwind v4 CSS-first configuration. Every token declared inside `@theme`
+ * becomes a first-class utility (`--color-aegis-500` → `bg-aegis-500`,
+ * `text-aegis-500`, `border-aegis-500`), so the design system has no JS config
+ * file and no duplicated palette.
+ *
+ * Design intent
+ *   Dark-first        A control room runs in low light for twelve hours.
+ *   Glassmorphism     Layered translucency communicates depth without borders.
+ *   Holographic blue  One accent hue; alarm colours stay reserved for alarms.
+ *   Apple spacing     Generous, consistent rhythm on a 4px grid.
+ *   Tesla minimalism  Chrome recedes; live data is the only thing that glows.
+ */
+
+@theme {
+  /* ---------------------------------------------------------------- surfaces */
+  /* Blue-tinted neutrals rather than pure grey: pure #000 reads as a dead panel. */
+  --color-void: #04060b;
+  --color-abyss: #070a11;
+  --color-surface: #0b101a;
+  --color-surface-raised: #111827;
+  --color-surface-overlay: #161f31;
+
+  /* --------------------------------------------------------------- ink */
+  --color-ink-primary: #e8eef7;
+  --color-ink-secondary: #9aa8bd;
+  --color-ink-tertiary: #647186;
+  --color-ink-inverse: #04060b;
+
+  /* ------------------------------------------------- holographic blue accent */
+  --color-aegis-50: #eaf3ff;
+  --color-aegis-100: #d0e5ff;
+  --color-aegis-200: #a6cfff;
+  --color-aegis-300: #7fc0ff;
+  --color-aegis-400: #4fa3ff;
+  --color-aegis-500: #2e8bff;
+  --color-aegis-600: #1b6fe0;
+  --color-aegis-700: #1454b0;
+  --color-aegis-800: #103d80;
+  --color-aegis-900: #0b2b5c;
+
+  /* Secondary hologram hue, used only for live/streaming affordances. */
+  --color-hologram: #37e1f5;
+
+  /* ------------------------------------------------------------- semantic */
+  --color-signal-info: #38bdf8;
+  --color-signal-success: #22c55e;
+  --color-signal-warning: #f59e0b;
+  --color-signal-danger: #ef4444;
+  --color-signal-critical: #ff3b5c;
+
+  /* Severity ladder. Deliberately identical to `IncidentSeverity` in
+     @aegisdrive/types so a severity string maps straight to a utility class. */
+  --color-severity-info: #64748b;
+  --color-severity-low: #38bdf8;
+  --color-severity-medium: #f59e0b;
+  --color-severity-high: #fb7185;
+  --color-severity-critical: #ff3b5c;
+
+  /* Threat posture ladder, mirroring `ThreatLevel`. */
+  --color-threat-minimal: #22c55e;
+  --color-threat-guarded: #84cc16;
+  --color-threat-elevated: #f59e0b;
+  --color-threat-high: #fb7185;
+  --color-threat-severe: #ff3b5c;
+
+  /* --------------------------------------------------------------- borders */
+  --color-hairline: rgb(255 255 255 / 6%);
+  --color-hairline-strong: rgb(126 176 255 / 18%);
+
+  /* ------------------------------------------------------------ typography */
+  --font-sans:
+    'Inter var', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono:
+    'JetBrains Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+
+  /* Tightened display sizes; body stays at comfortable reading measure. */
+  --text-display: 2.75rem;
+  --text-display--line-height: 1.05;
+  --text-display--letter-spacing: -0.03em;
+  --text-title: 1.75rem;
+  --text-title--line-height: 1.15;
+  --text-title--letter-spacing: -0.02em;
+  --text-metric: 2.125rem;
+  --text-metric--line-height: 1;
+  --text-metric--letter-spacing: -0.02em;
+  --text-overline: 0.6875rem;
+  --text-overline--line-height: 1.2;
+  --text-overline--letter-spacing: 0.14em;
+
+  /* ---------------------------------------------------------------- radii */
+  --radius-panel: 1.25rem;
+  --radius-card: 1rem;
+  --radius-control: 0.625rem;
+  --radius-pill: 9999px;
+
+  /* -------------------------------------------------------------- shadows */
+  --shadow-panel: 0 1px 0 0 rgb(255 255 255 / 4%) inset, 0 24px 48px -24px rgb(0 0 0 / 80%);
+  --shadow-raised: 0 1px 0 0 rgb(255 255 255 / 6%) inset, 0 8px 24px -12px rgb(0 0 0 / 70%);
+  --shadow-glow: 0 0 0 1px rgb(46 139 255 / 30%), 0 0 32px -8px rgb(46 139 255 / 45%);
+  --shadow-alarm: 0 0 0 1px rgb(255 59 92 / 40%), 0 0 40px -8px rgb(255 59 92 / 55%);
+
+  /* ------------------------------------------------------------ animation */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out-quint: cubic-bezier(0.83, 0, 0.17, 1);
+  --animate-pulse-ring: pulse-ring 2.4s var(--ease-out-expo) infinite;
+  --animate-sweep: sweep 3.2s linear infinite;
+  --animate-rise: rise 0.4s var(--ease-out-expo) both;
+}
+
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgb(46 139 255 / 45%);
+  }
+  70% {
+    box-shadow: 0 0 0 12px rgb(46 139 255 / 0%);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgb(46 139 255 / 0%);
+  }
+}
+
+@keyframes sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background-color: var(--color-void);
+    color: var(--color-ink-primary);
+    font-family: var(--font-sans);
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'tnum';
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Numeric telemetry must not jitter as digits change. */
+  [data-numeric] {
+    font-variant-numeric: tabular-nums;
+    font-family: var(--font-mono);
+  }
+
+  ::selection {
+    background-color: rgb(46 139 255 / 30%);
+  }
+
+  /* Thin, self-effacing scrollbars — the control room has enough chrome. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(255 255 255 / 12%) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: rgb(255 255 255 / 12%);
+    border-radius: var(--radius-pill);
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(255 255 255 / 20%);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-aegis-400);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@utility glass {
+  background: linear-gradient(
+    180deg,
+    rgb(255 255 255 / 5%) 0%,
+    rgb(255 255 255 / 2%) 40%,
+    rgb(255 255 255 / 1%) 100%
+  );
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border: 1px solid var(--color-hairline);
+}
+
+@utility glass-strong {
+  background: linear-gradient(180deg, rgb(22 31 49 / 82%) 0%, rgb(11 16 26 / 88%) 100%);
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  border: 1px solid var(--color-hairline-strong);
+}
+
+/* A single hairline of accent light along the top edge — the "holographic" cue. */
+@utility holo-edge {
+  position: relative;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset-inline: 12%;
+    top: 0;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgb(46 139 255 / 70%) 35%,
+      rgb(55 225 245 / 70%) 65%,
+      transparent
+    );
+    pointer-events: none;
+  }
+}
+
+/* Radial vignette used behind the map and the dashboard hero. */
+@utility grid-backdrop {
+  background-image:
+    radial-gradient(ellipse 80% 60% at 50% -10%, rgb(46 139 255 / 12%), transparent 70%),
+    linear-gradient(rgb(255 255 255 / 3%) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 3%) 1px, transparent 1px);
+  background-size:
+    100% 100%,
+    48px 48px,
+    48px 48px;
+}

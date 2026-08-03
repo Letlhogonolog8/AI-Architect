@@ -1,0 +1,27 @@
+{
+  "name": "@aegisdrive/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Isomorphic business rules, RBAC policy, constants and utilities.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./rbac": "./src/rbac/index.ts",
+    "./errors": "./src/errors/index.ts",
+    "./utils": "./src/utils/index.ts",
+    "./validation": "./src/validation/index.ts",
+    "./constants": "./src/constants.ts",
+    "./identity": "./src/identity/index.ts",
+    "./behaviour": "./src/behaviour/index.ts",
+    "./cabin": "./src/cabin/index.ts",
+    "./decision": "./src/decision/index.ts",
+    "./corridor": "./src/corridor/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@aegisdrive/types": "workspace:*",
+    "zod": "catalog:"
+  }
+}
