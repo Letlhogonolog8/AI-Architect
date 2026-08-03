@@ -1,4 +1,5 @@
 import { pino, type Logger } from 'pino';
+import { LOG_REDACT_CENSOR, LOG_REDACT_PATHS } from '@aegisdrive/shared';
 import { env, isDevelopment } from '../config/env';
 
 /**
@@ -7,26 +8,17 @@ import { env, isDevelopment } from '../config/env';
  * JSON to stdout in every environment except local development, where a
  * pretty transport is worth the worker thread. The redaction list is not
  * optional: this service handles credentials, tokens and location data, and a
- * single logged `Authorization` header is a reportable incident.
+ * single logged `Authorization` header is a reportable incident. It is shared
+ * with every background worker — see packages/shared/src/logging/redact.ts —
+ * so this policy cannot drift between processes.
  */
 export const logger: Logger = pino({
   level: env.LOG_LEVEL,
   base: { service: 'aegisdrive-api', env: env.NODE_ENV },
   timestamp: pino.stdTimeFunctions.isoTime,
   redact: {
-    paths: [
-      'req.headers.authorization',
-      'req.headers.cookie',
-      'res.headers["set-cookie"]',
-      '*.password',
-      '*.refreshToken',
-      '*.accessToken',
-      '*.mfaSecret',
-      'password',
-      'refreshToken',
-      'accessToken',
-    ],
-    censor: '[redacted]',
+    paths: LOG_REDACT_PATHS,
+    censor: LOG_REDACT_CENSOR,
   },
   ...(isDevelopment
     ? {

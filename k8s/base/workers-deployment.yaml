@@ -1,0 +1,148 @@
+# Background workers. None of these serve HTTP, so there is no readiness or
+# liveness probe to attach — Kubernetes already restarts a container whose
+# process exits (see each worker's own SIGTERM/uncaught-exception handling in
+# services/*/src/index.ts), which is the health signal that actually exists.
+#
+# Replica counts are not uniform, and that is deliberate:
+#   - notifications takes a Postgres advisory lock before draining, so a
+#     second replica is a safe warm standby, not a duplicate sender.
+#   - telemetry and evidence poll and mutate rows with no such lock; two
+#     replicas would race the same batch and do (harmless but wasteful)
+#     duplicate work, so each stays at exactly one.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notifications-worker
+  labels:
+    app.kubernetes.io/name: notifications-worker
+    app.kubernetes.io/part-of: aegisdrive
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: notifications-worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: notifications-worker
+        app.kubernetes.io/part-of: aegisdrive
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: notifications-worker
+          image: ghcr.io/aegisdrive/notifications-worker:latest
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: aegisdrive-config
+            - secretRef:
+                name: aegisdrive-secrets
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ['ALL']
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: telemetry-worker
+  labels:
+    app.kubernetes.io/name: telemetry-worker
+    app.kubernetes.io/part-of: aegisdrive
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: telemetry-worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: telemetry-worker
+        app.kubernetes.io/part-of: aegisdrive
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: telemetry-worker
+          image: ghcr.io/aegisdrive/telemetry-worker:latest
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: aegisdrive-config
+            - secretRef:
+                name: aegisdrive-secrets
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ['ALL']
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: evidence-worker
+  labels:
+    app.kubernetes.io/name: evidence-worker
+    app.kubernetes.io/part-of: aegisdrive
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: evidence-worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: evidence-worker
+        app.kubernetes.io/part-of: aegisdrive
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: evidence-worker
+          image: ghcr.io/aegisdrive/evidence-worker:latest
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: aegisdrive-config
+            - secretRef:
+                name: aegisdrive-secrets
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ['ALL']
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi

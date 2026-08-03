@@ -1,0 +1,260 @@
+name: Release
+
+# Two distinct events, two distinct targets:
+#   - a push to `main` (post-merge, already gated by ci.yml) builds and ships
+#     to staging automatically — that is what staging is for.
+#   - a `v*.*.*` tag is a deliberate human act and is what reaches production.
+# Nothing here runs on `pull_request`: an unreviewed branch must never be able
+# to push an image or touch a cluster.
+on:
+  push:
+    branches: [main]
+    tags: ['v*.*.*']
+
+# Deploys must never be cancelled mid-flight by a newer push superseding
+# them — unlike ci.yml's PR checks, an interrupted `kubectl apply` can leave a
+# rollout half-applied.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  # Fixed, not derived from `github.repository_owner`: every `k8s/base` and
+  # `k8s/overlays/*` manifest hardcodes `ghcr.io/aegisdrive/*` as the image
+  # name. `kustomize edit set image` below matches on that name *exactly* to
+  # update the existing entry — a namespace that drifted from the manifests
+  # (e.g. because this repo actually lives under a different GitHub org)
+  # would not fail loudly, it would silently append a second, wrong image
+  # override that nothing ever reads. If the real registry namespace differs,
+  # change it here *and* in every `images:` block under `k8s/`, together.
+  IMAGE_NAMESPACE: aegisdrive
+  NODE_VERSION: '22'
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-push:
+    name: Build and push ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # GITHUB_TOKEN already has package-write scope for this repo's own GHCR
+    # namespace — no separate registry credential to provision or rotate.
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: api
+            dockerfile: apps/api/Dockerfile
+          - name: web
+            dockerfile: apps/web/Dockerfile
+          - name: notifications-worker
+            dockerfile: infra/docker/worker.Dockerfile
+            buildArgs: |
+              SERVICE_NAME=notifications
+              SERVICE_PACKAGE=@aegisdrive/notifications-service
+          - name: telemetry-worker
+            dockerfile: infra/docker/worker.Dockerfile
+            buildArgs: |
+              SERVICE_NAME=telemetry
+              SERVICE_PACKAGE=@aegisdrive/telemetry-service
+          - name: evidence-worker
+            dockerfile: infra/docker/worker.Dockerfile
+            buildArgs: |
+              SERVICE_NAME=evidence
+              SERVICE_PACKAGE=@aegisdrive/evidence-service
+          - name: postgres-backup
+            dockerfile: infra/docker/backup.Dockerfile
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # One tag per commit (sha-xxxxxxx, always) plus the semver tag and
+      # `latest` on an actual release. The sha tag is what deploy-staging
+      # below pins to — a mutable `edge`/`latest` tag would mean two staging
+      # deploys minutes apart silently point at different code with no
+      # record of which.
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.name }}
+          tags: |
+            type=sha,prefix=sha-,format=short
+            type=semver,pattern={{version}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          build-args: ${{ matrix.buildArgs || '' }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+  check-cluster-credentials:
+    name: Check which clusters are configured
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Deliberately its own job rather than a job-level `if: secrets.X != ''`:
+    # the `secrets` context is not reliable to reference directly in a job
+    # `if:` condition, but reading it inside a `run:` step (the normal way
+    # secrets are ever used) and exposing the result as a job output is.
+    # Until KUBE_CONFIG_STAGING/KUBE_CONFIG_PRODUCTION are added as repository
+    # secrets, both deploy jobs below are skipped — not failed — so this
+    # workflow is safe to merge before either cluster exists.
+    outputs:
+      staging: ${{ steps.check.outputs.staging }}
+      production: ${{ steps.check.outputs.production }}
+    steps:
+      - id: check
+        run: |
+          echo "staging=${{ secrets.KUBE_CONFIG_STAGING != '' }}" >> "$GITHUB_OUTPUT"
+          echo "production=${{ secrets.KUBE_CONFIG_PRODUCTION != '' }}" >> "$GITHUB_OUTPUT"
+
+  deploy-staging:
+    name: Deploy to staging
+    needs: [build-and-push, check-cluster-credentials]
+    if: github.ref == 'refs/heads/main' && needs.check-cluster-credentials.outputs.staging == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: staging
+      url: https://staging.aegisdrive.ai
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Set up kubectl and kustomize
+        run: |
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl && sudo mv kubectl /usr/local/bin/kubectl
+          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          chmod +x kustomize && sudo mv kustomize /usr/local/bin/kustomize
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p "$HOME/.kube"
+          echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > "$HOME/.kube/config"
+
+      # Runs as its own step, deliberately not inside the manifests:
+      # `docs/runbook.md`'s deployment order requires migrations to complete
+      # *before* the API rolls, and a Job embedded in `kubectl apply -k`
+      # alongside the Deployments it is supposed to precede cannot guarantee
+      # that ordering.
+      - name: Run database migrations
+        run: |
+          pnpm install --frozen-lockfile --filter @aegisdrive/api...
+          pnpm --filter @aegisdrive/api run db:generate
+          pnpm --filter @aegisdrive/api run db:deploy
+          pnpm --filter @aegisdrive/api run db:seed
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_MIGRATION_DATABASE_URL }}
+          NODE_ENV: production
+
+      - name: Pin images to this commit
+        working-directory: k8s/overlays/staging
+        run: |
+          SHA_TAG="sha-$(git rev-parse --short HEAD)"
+          for image in api web notifications-worker telemetry-worker evidence-worker postgres-backup; do
+            kustomize edit set image "${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${image}=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${image}:${SHA_TAG}"
+          done
+          kubectl kustomize . > /dev/null # fail fast on a malformed overlay before applying it
+
+      - name: Apply
+        run: kubectl apply -k k8s/overlays/staging
+
+      - name: Wait for rollout
+        run: |
+          kubectl -n aegisdrive-staging rollout status deployment/api --timeout=5m
+          kubectl -n aegisdrive-staging rollout status deployment/web --timeout=5m
+
+  deploy-production:
+    name: Deploy to production
+    needs: [build-and-push, check-cluster-credentials]
+    if: startsWith(github.ref, 'refs/tags/v') && needs.check-cluster-credentials.outputs.production == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # A GitHub Environment with required reviewers configured in this repo's
+    # own Settings → Environments is what actually makes this a gated,
+    # approved deploy — that protection rule lives in repo settings, not in
+    # this file, and must be configured there before tagging a release.
+    environment:
+      name: production
+      url: https://app.aegisdrive.ai
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Set up kubectl and kustomize
+        run: |
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl && sudo mv kubectl /usr/local/bin/kubectl
+          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          chmod +x kustomize && sudo mv kustomize /usr/local/bin/kustomize
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p "$HOME/.kube"
+          echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" | base64 -d > "$HOME/.kube/config"
+
+      - name: Run database migrations
+        run: |
+          # Runs from the release tag's own commit, against production,
+          # before any workload manifest changes — see docs/runbook.md's
+          # deployment order. Requires a DATABASE_URL with migration
+          # privileges as a repository secret, separate from the read-only
+          # credential the backup CronJob uses (docs/backup-restore.md).
+          pnpm install --frozen-lockfile --filter @aegisdrive/api...
+          pnpm --filter @aegisdrive/api run db:generate
+          pnpm --filter @aegisdrive/api run db:deploy
+          pnpm --filter @aegisdrive/api run db:seed
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_MIGRATION_DATABASE_URL }}
+          NODE_ENV: production
+
+      - name: Pin images to this release
+        working-directory: k8s/overlays/production
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          for image in api web notifications-worker telemetry-worker evidence-worker postgres-backup; do
+            kustomize edit set image "${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${image}=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${image}:${TAG}"
+          done
+          kubectl kustomize . > /dev/null # fail fast on a malformed overlay before applying it
+
+      - name: Apply
+        run: kubectl apply -k k8s/overlays/production
+
+      - name: Wait for rollout
+        run: |
+          kubectl -n aegisdrive-production rollout status deployment/api --timeout=10m
+          kubectl -n aegisdrive-production rollout status deployment/web --timeout=10m
+          kubectl -n aegisdrive-production rollout status deployment/notifications-worker --timeout=5m

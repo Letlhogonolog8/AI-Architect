@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: aegisdrive
+  labels:
+    app.kubernetes.io/part-of: aegisdrive
+    # Enforced by the cluster's built-in Pod Security admission controller,
+    # not by anything in this repo: a pod that does not run as non-root, drop
+    # every capability and refuse privilege escalation (every Deployment and
+    # CronJob in this directory already does — see each one's securityContext)
+    # is rejected at admission, before it can schedule. Belt-and-braces on top
+    # of those per-pod settings, so a manifest edited to remove them still
+    # cannot run.
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest

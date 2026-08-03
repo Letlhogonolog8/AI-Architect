@@ -5,3 +5,4 @@ export { authenticate, optionalAuthenticate } from './authenticate.middleware';
 export { requirePermissions, requireAnyPermission, requireRoles } from './authorize.middleware';
 export { rateLimit, authRateLimit, ingestRateLimit } from './rate-limit.middleware';
 export { securityHeaders, corsMiddleware } from './security.middleware';
+export { metricsMiddleware } from './metrics.middleware';

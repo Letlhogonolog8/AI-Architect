@@ -15,13 +15,20 @@
     "./behaviour": "./src/behaviour/index.ts",
     "./cabin": "./src/cabin/index.ts",
     "./decision": "./src/decision/index.ts",
-    "./corridor": "./src/corridor/index.ts"
+    "./corridor": "./src/corridor/index.ts",
+    "./logging": "./src/logging/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@aegisdrive/types": "workspace:*",
     "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "catalog:",
+    "vitest": "catalog:"
   }
 }

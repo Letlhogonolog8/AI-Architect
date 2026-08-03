@@ -37,6 +37,14 @@ const envSchema = z
     AI_SERVICE_URL: z.string().url().optional(),
     /** Shared secret for service-to-service calls from the background workers. */
     INTERNAL_SERVICE_TOKEN: z.string().min(32).optional(),
+
+    /**
+     * Bearer token guarding `/metrics`. Optional because the NetworkPolicy in
+     * k8s/base/networkpolicy.yaml is the primary boundary — this is a second
+     * layer for the case where that policy is misconfigured or absent, e.g. a
+     * developer's local cluster.
+     */
+    METRICS_TOKEN: z.string().min(16).optional(),
   })
   .superRefine((value, ctx) => {
     if (value.NODE_ENV !== 'production') return;

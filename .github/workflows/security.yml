@@ -57,3 +57,38 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  codeql:
+    name: Static analysis (CodeQL)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # CodeQL's own results upload needs this beyond the workflow's default
+    # `contents: read` — scoped to exactly this job, not the whole workflow.
+    permissions:
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # Python's `services/ai` gateway is analysed separately; every other
+        # language in the monorepo (apps/api, apps/web, the workers, packages/*)
+        # is TypeScript/JavaScript and CodeQL analyses them together in one pass.
+        language: ['javascript-typescript', 'python']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+
+      # No explicit build step: CodeQL's autobuild is sufficient for both
+      # languages here — neither requires a compiled artefact to analyse, only
+      # the source, and the platform's own `pnpm run build` is already covered
+      # by the `verify` and `docker` jobs in ci.yml.
+      - uses: github/codeql-action/autobuild@v3
+
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: '/language:${{ matrix.language }}'

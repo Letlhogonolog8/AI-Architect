@@ -1,0 +1,90 @@
+# Not in kustomization.yaml's resource list, same reasoning as
+# secret.example.yaml and servicemonitor.example.yaml: self-hosted PgBouncer
+# is the fallback, not the default — see docs/postgres-optimization.md for why
+# a managed Postgres's own pooler (RDS Proxy, Cloud SQL's built-in pooling,
+# Aiven's PgBouncer add-on) is the first choice, and only copy this into an
+# overlay if the target provider genuinely has none.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pgbouncer
+  labels:
+    app.kubernetes.io/name: pgbouncer
+spec:
+  # Two, not one: PgBouncer itself becomes a single point of failure between
+  # every API/worker replica and Postgres otherwise.
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: pgbouncer
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: pgbouncer
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 100
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: pgbouncer
+          image: edoburu/pgbouncer:1.24.1
+          ports:
+            - name: pgbouncer
+              containerPort: 6432
+          envFrom:
+            # PGBOUNCER_AUTH_USER / PGBOUNCER_AUTH_PASSWORD — the role created
+            # by generate-auth-function.sql, not the application's own DB role.
+            - secretRef:
+                name: pgbouncer-secrets
+          volumeMounts:
+            - name: config
+              mountPath: /etc/pgbouncer/pgbouncer.ini
+              subPath: pgbouncer.ini
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ['ALL']
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 128Mi
+          readinessProbe:
+            tcpSocket:
+              port: pgbouncer
+            initialDelaySeconds: 3
+            periodSeconds: 10
+      volumes:
+        - name: config
+          configMap:
+            name: pgbouncer-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pgbouncer
+  labels:
+    app.kubernetes.io/name: pgbouncer
+spec:
+  selector:
+    app.kubernetes.io/name: pgbouncer
+  ports:
+    - name: pgbouncer
+      port: 6432
+      targetPort: pgbouncer
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pgbouncer-config
+data:
+  # Copy of infra/docker/pgbouncer/pgbouncer.ini, with `host=postgres` in
+  # [databases] replaced by the real managed Postgres endpoint.
+  pgbouncer.ini: |
+    (see infra/docker/pgbouncer/pgbouncer.ini)

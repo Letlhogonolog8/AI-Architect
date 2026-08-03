@@ -15,6 +15,7 @@ import { moduleLogger } from '../core/logger';
 import { redisPublisher, redisSubscriber } from '../cache/redis';
 import { verifyAccessToken } from '../modules/auth/token.service';
 import { loadAuthUser } from '../modules/auth/auth.repository';
+import { realtimeConnectedClients } from '../observability/metrics';
 import { setRealtimeServer } from './emitter';
 
 const log = moduleLogger('realtime');
@@ -87,6 +88,7 @@ export function createRealtimeServer(httpServer: HttpServer): AegisSocketServer 
     const { userId, organizationId } = socket.data;
 
     void socket.join(RealtimeRoom.organization(organizationId));
+    realtimeConnectedClients.inc();
 
     log.debug({ socketId: socket.id, userId, organizationId }, 'Realtime client connected');
 
@@ -114,6 +116,7 @@ export function createRealtimeServer(httpServer: HttpServer): AegisSocketServer 
     });
 
     socket.on('disconnect', (reason) => {
+      realtimeConnectedClients.dec();
       log.debug({ socketId: socket.id, userId, reason }, 'Realtime client disconnected');
     });
   });

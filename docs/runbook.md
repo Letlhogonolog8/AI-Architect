@@ -115,6 +115,12 @@ Check Redis.
 Migrations must be backwards-compatible with the currently deployed API, since
 both run simultaneously during a rolling deploy.
 
+`.github/workflows/release.yml` automates exactly this order for both staging
+(on every merge to `main`) and production (on a version tag) — see
+`docs/deployment.md` for the full pipeline, required secrets, and the one
+placeholder every deployment target must replace before it will push or pull
+any image.
+
 ## Security incident: suspected credential compromise
 
 ```bash

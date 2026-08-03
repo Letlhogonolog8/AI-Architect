@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aegisdrive-config
+data:
+  NODE_ENV: 'production' # still the production code path — only the environment differs
+  LOG_LEVEL: 'debug'
+  CORS_ORIGINS: 'https://staging.aegisdrive.ai'

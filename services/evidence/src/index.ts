@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { pino } from 'pino';
 import { EvidenceStatus } from '@aegisdrive/types';
+import { LOG_REDACT_CENSOR, LOG_REDACT_PATHS } from '@aegisdrive/shared';
 import { hasObjectStore, serviceEnv } from './config';
 
 /**
@@ -19,7 +20,11 @@ import { hasObjectStore, serviceEnv } from './config';
  * never silently repaired: an artefact whose bytes changed is no longer
  * evidence, and pretending otherwise is the worst thing this system could do.
  */
-const logger = pino({ level: serviceEnv.LOG_LEVEL, base: { service: 'evidence' } });
+const logger = pino({
+  level: serviceEnv.LOG_LEVEL,
+  base: { service: 'evidence' },
+  redact: { paths: LOG_REDACT_PATHS, censor: LOG_REDACT_CENSOR },
+});
 const prisma = new PrismaClient();
 
 let running = true;

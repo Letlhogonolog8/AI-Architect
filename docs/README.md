@@ -10,6 +10,13 @@
 | [architecture/data-model.md](architecture/data-model.md)                               | The entities and the invariants they carry                |
 | [api.md](api.md)                                                                       | Every endpoint, its permission and its shape              |
 | [runbook.md](runbook.md)                                                               | Setup, common tasks, and what to do when something breaks |
+| [deployment.md](deployment.md)                                                         | Production deployment, end to end — start here for Phase 12 |
+| [postgres-optimization.md](postgres-optimization.md)                                   | Connection pooling, slow queries, autovacuum, partitioning |
+| [redis-production.md](redis-production.md)                                             | What Redis holds, TLS/auth, why it needs no backup         |
+| [backup-restore.md](backup-restore.md)                                                 | Postgres backup, restore procedure, recovery targets       |
+| [security-hardening.md](security-hardening.md)                                         | Every security control and where it lives                  |
+| [logging.md](logging.md)                                                               | Structured logging, correlation, aggregation                |
+| [performance.md](performance.md)                                                       | Every performance lever and where it lives                  |
 
 ## Architecture decision records
 

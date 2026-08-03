@@ -1,0 +1,67 @@
+# Logical (pg_dump) backup — see docs/backup-restore.md for how this relates
+# to the managed Postgres provider's own automated snapshots (both run; they
+# cover different failure modes).
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup
+spec:
+  # Daily at 04:00 UTC — matches the security-audit workflow's off-peak
+  # scheduling (.github/workflows/security.yml) for the same reason: cheapest
+  # time to run something that briefly adds load to the primary database.
+  schedule: '0 4 * * *'
+  concurrencyPolicy: Forbid
+  # A backup that starts nine hours late because a prior run hung is a
+  # backup that will not run at all that day — better to skip a run than to
+  # execute it against a completely different part of the day's traffic
+  # pattern.
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 7
+  failedJobsHistoryLimit: 7
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 3600
+      template:
+        metadata:
+          labels:
+            # Matched by networkpolicy.yaml's allow-egress-to-datastores rule
+            # — without this label the default-deny policy blocks this pod
+            # from reaching either Postgres or the object store over HTTPS.
+            app.kubernetes.io/name: postgres-backup
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 999 # postgres user in the postgres:16-alpine base image
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: postgres-backup
+              image: ghcr.io/aegisdrive/postgres-backup:latest
+              envFrom:
+                - secretRef:
+                    name: aegisdrive-backup-secrets
+              volumeMounts:
+                - name: rclone-config
+                  mountPath: /etc/rclone
+                  readOnly: true
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ['ALL']
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+          volumes:
+            - name: rclone-config
+              secret:
+                secretName: aegisdrive-backup-secrets
+                items:
+                  - key: rclone.conf
+                    path: rclone.conf

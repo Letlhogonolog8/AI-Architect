@@ -1,0 +1,12 @@
+# Only meaningful in production, where notifications-worker actually runs at
+# 2 replicas (base) instead of staging's 1 — a PDB with minAvailable equal to
+# the replica count would block every voluntary eviction.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: notifications-worker
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: notifications-worker

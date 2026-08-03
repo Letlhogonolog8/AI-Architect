@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { pino } from 'pino';
+import { LOG_REDACT_CENSOR, LOG_REDACT_PATHS } from '@aegisdrive/shared';
 import { serviceEnv } from './config';
 
 /**
@@ -18,7 +19,11 @@ import { serviceEnv } from './config';
  * Aggregation into daily per-vehicle rollups, so history survives the deletion,
  * is the next milestone: see `docs/architecture/telemetry-pipeline.md`.
  */
-const logger = pino({ level: serviceEnv.LOG_LEVEL, base: { service: 'telemetry' } });
+const logger = pino({
+  level: serviceEnv.LOG_LEVEL,
+  base: { service: 'telemetry' },
+  redact: { paths: LOG_REDACT_PATHS, censor: LOG_REDACT_CENSOR },
+});
 const prisma = new PrismaClient();
 
 let running = true;

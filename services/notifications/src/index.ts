@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { Redis } from 'ioredis';
 import { pino } from 'pino';
 import { NotificationStatus } from '@aegisdrive/types';
+import { LOG_REDACT_CENSOR, LOG_REDACT_PATHS } from '@aegisdrive/shared';
 import { serviceEnv } from './config';
 import { deliver } from './channels';
 
@@ -27,6 +28,7 @@ import { deliver } from './channels';
 const logger = pino({
   level: serviceEnv.LOG_LEVEL,
   base: { service: 'notifications' },
+  redact: { paths: LOG_REDACT_PATHS, censor: LOG_REDACT_CENSOR },
 });
 
 const prisma = new PrismaClient();

@@ -1,0 +1,21 @@
+# Local/dev-parity Prometheus. In a real cluster this config is superseded by
+# the ServiceMonitor CRD (see k8s/base/servicemonitor.example.yaml) discovering
+# targets through the Kubernetes API instead of a static list — this file
+# exists so `docker compose --profile monitoring up` gives the same dashboards
+# without a cluster.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+scrape_configs:
+  - job_name: aegisdrive-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['api:4000']
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']

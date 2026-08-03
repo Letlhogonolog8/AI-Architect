@@ -1,6 +1,7 @@
 import { PrismaClient, type Prisma } from '@prisma/client';
 import { env, isDevelopment, isProduction } from '../config/env';
 import { logger } from '../core/logger';
+import { dbSlowQueriesTotal } from '../observability/metrics';
 
 /**
  * Prisma emits logs either to stdout or as events. Events are the only option
@@ -40,15 +41,20 @@ if (isDevelopment) {
 prisma.$on('warn', (event) => logger.warn({ prisma: event }, 'Prisma warning'));
 prisma.$on('error', (event) => logger.error({ prisma: event }, 'Prisma error'));
 
-if (!isProduction) {
-  prisma.$on('query', (event) => {
-    // Slow-query surfacing. The threshold is deliberately low: telemetry reads
-    // are the hot path and a 200ms query there is already a production problem.
-    if (event.duration >= 200) {
-      logger.debug({ durationMs: event.duration, query: event.query }, 'Slow query');
-    }
-  });
-}
+// Slow-query surfacing runs in every environment, production included — that
+// is the one environment this matters most in. The threshold is deliberately
+// low: telemetry reads are the hot path and a 200ms query there is already a
+// problem. Logged at `warn` (not `debug`) in production so it is visible at
+// the platform's default LOG_LEVEL=info without anyone having to turn on
+// verbose logging after the fact; see docs/postgres-optimization.md for how
+// to act on ApiHighLatencyP95 alongside this.
+prisma.$on('query', (event) => {
+  if (event.duration < 200) return;
+
+  dbSlowQueriesTotal.inc();
+  const log = isProduction ? logger.warn.bind(logger) : logger.debug.bind(logger);
+  log({ durationMs: event.duration, query: event.query }, 'Slow query');
+});
 
 export async function connectDatabase(): Promise<void> {
   await prisma.$connect();

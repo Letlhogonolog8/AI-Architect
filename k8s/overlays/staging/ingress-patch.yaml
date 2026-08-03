@@ -1,0 +1,35 @@
+# Ingress rules and tls are plain lists with no strategic-merge key, so
+# Kubernetes replaces the whole list rather than merging item-by-item — this
+# patch repeats the full base shape with the staging host substituted in.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: aegisdrive
+  annotations:
+    # letsencrypt-staging: production's issuer is rate-limited per hostname,
+    # and every staging deploy would otherwise compete for that same budget.
+    cert-manager.io/cluster-issuer: letsencrypt-staging
+spec:
+  tls:
+    - hosts: ['staging.aegisdrive.ai']
+      secretName: aegisdrive-staging-tls
+  rules:
+    - host: staging.aegisdrive.ai
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service: { name: api, port: { name: http } }
+          - path: /realtime
+            pathType: Prefix
+            backend:
+              service: { name: api, port: { name: http } }
+          - path: /health
+            pathType: Prefix
+            backend:
+              service: { name: api, port: { name: http } }
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: web, port: { name: http } }

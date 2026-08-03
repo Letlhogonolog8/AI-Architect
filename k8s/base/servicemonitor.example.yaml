@@ -1,0 +1,25 @@
+# Not in kustomization.yaml's resource list, same reasoning as secret.example.yaml:
+# this is a CRD owned by the Prometheus Operator (installed via the
+# kube-prometheus-stack Helm chart), and applying it against a cluster that
+# does not have that CRD registered fails the whole `kubectl apply -k`. Copy
+# it into your overlay once the operator is installed.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: aegisdrive-api
+  labels:
+    # Matched by the kube-prometheus-stack Prometheus's serviceMonitorSelector
+    # in most default installs; adjust to whatever your Prometheus actually
+    # selects on.
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: api
+  namespaceSelector:
+    matchNames: ['aegisdrive-production', 'aegisdrive-staging']
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s

@@ -59,6 +59,12 @@ jobs:
       - name: Check formatting
         run: pnpm run format:check
 
+      # Runs before typecheck: a fast, isolated signal (each package supplies its
+      # own test env — see apps/api/vitest.config.ts) that catches logic
+      # regressions before paying for a full workspace build.
+      - name: Unit tests
+        run: pnpm run test:ci
+
       # Scoped to exclude artifacts/**: that directory holds an uncommitted
       # legacy prototype (see ADR-0001) with one pre-existing typecheck
       # failure (artifacts/command-center/src/pages/DriverDetail.tsx) that
@@ -215,6 +221,23 @@ jobs:
             dockerfile: apps/api/Dockerfile
           - name: web
             dockerfile: apps/web/Dockerfile
+          - name: notifications-worker
+            dockerfile: infra/docker/worker.Dockerfile
+            buildArgs: |
+              SERVICE_NAME=notifications
+              SERVICE_PACKAGE=@aegisdrive/notifications-service
+          - name: telemetry-worker
+            dockerfile: infra/docker/worker.Dockerfile
+            buildArgs: |
+              SERVICE_NAME=telemetry
+              SERVICE_PACKAGE=@aegisdrive/telemetry-service
+          - name: evidence-worker
+            dockerfile: infra/docker/worker.Dockerfile
+            buildArgs: |
+              SERVICE_NAME=evidence
+              SERVICE_PACKAGE=@aegisdrive/evidence-service
+          - name: postgres-backup
+            dockerfile: infra/docker/backup.Dockerfile
 
     steps:
       - uses: actions/checkout@v4
@@ -225,8 +248,29 @@ jobs:
         with:
           context: .
           file: ${{ matrix.dockerfile }}
+          build-args: ${{ matrix.buildArgs || '' }}
           # Verification only. Publishing happens in the release workflow, from
           # a tag, so an unreviewed commit can never become a deployable image.
           push: false
+          # Loaded into the local daemon (rather than left as a build cache
+          # artefact) specifically so the Trivy step below has something to
+          # scan — a build result with no vulnerability check is just as
+          # unverified as no build at all.
+          load: true
+          tags: aegisdrive/${{ matrix.name }}:ci
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+      # Scans the image actually built above, not a registry tag — catches an
+      # OS package or dependency with a known CVE before it ever reaches the
+      # release workflow that would otherwise push it. Same high/critical-only
+      # gate as the dependency audit in .github/workflows/security.yml, for
+      # the same reason: a hard fail on every low-severity OS package finding
+      # trains people to bypass the gate.
+      - name: Scan ${{ matrix.name }} for vulnerabilities
+        uses: aquasecurity/trivy-action@0.29.0
+        with:
+          image-ref: aegisdrive/${{ matrix.name }}:ci
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          ignore-unfixed: true

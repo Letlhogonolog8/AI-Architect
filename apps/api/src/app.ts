@@ -1,4 +1,5 @@
 import express, { type Express } from 'express';
+import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import { pinoHttp } from 'pino-http';
 import { API_PREFIX } from '@aegisdrive/shared';
@@ -7,12 +8,14 @@ import { getRequestId } from './core/request-context';
 import {
   corsMiddleware,
   errorHandler,
+  metricsMiddleware,
   notFoundHandler,
   rateLimit,
   requestContext,
   securityHeaders,
 } from './middleware';
 import { healthRoutes } from './modules/health/health.routes';
+import { metricsRoutes } from './observability/metrics.routes';
 import { apiRouter } from './routes';
 
 /**
@@ -26,7 +29,8 @@ import { apiRouter } from './routes';
  *   2. request context — everything below logs and audits with a request id.
  *   3. security + CORS — reject disallowed origins before doing any work.
  *   4. body parsing    — with a size cap, before anything reads `req.body`.
- *   5. health          — outside the rate limiter, so probes are never throttled.
+ *   5. health, metrics — outside the rate limiter, so probes and scrapes are
+ *                        never throttled.
  *   6. rate limit      — protects only the application surface.
  *   7. routes          — the API itself.
  *   8. 404, then error — terminal handlers, error last.
@@ -52,13 +56,17 @@ export function createApp(): Express {
         return 'debug';
       },
       autoLogging: {
-        ignore: (req) => req.url?.startsWith('/health') ?? false,
+        ignore: (req) => req.url?.startsWith('/health') || req.url?.startsWith('/metrics'),
       },
     }),
   );
 
   app.use(securityHeaders);
   app.use(corsMiddleware);
+  // Telemetry batches and dashboard payloads are large, repetitive JSON — a
+  // good compression ratio for near-zero CPU cost at this traffic level.
+  app.use(compression());
+  app.use(metricsMiddleware);
 
   // 2 MB is generous for JSON. Media never travels through this process — it is
   // uploaded directly to object storage against a signed URL.
@@ -67,6 +75,7 @@ export function createApp(): Express {
   app.use(cookieParser());
 
   app.use('/health', healthRoutes);
+  app.use('/metrics', metricsRoutes);
 
   app.use(rateLimit());
 

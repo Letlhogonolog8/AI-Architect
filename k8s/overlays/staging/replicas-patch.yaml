@@ -1,0 +1,23 @@
+# A single replica of everything: staging exists to prove a build works, not
+# to survive a node failure. The HPAs in base still apply and can scale a
+# staging deployment up temporarily for a load test.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+spec:
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notifications-worker
+spec:
+  replicas: 1

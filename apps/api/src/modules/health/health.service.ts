@@ -2,6 +2,7 @@ import { isCacheReachable } from '../../cache/redis';
 import { isDatabaseReachable } from '../../db/prisma';
 import { connectedClientCount } from '../../realtime/emitter';
 import { env } from '../../config/env';
+import { dependencyUp } from '../../observability/metrics';
 
 export interface DependencyHealth {
   status: 'up' | 'down';
@@ -40,6 +41,9 @@ export async function checkHealth(): Promise<HealthReport> {
     timed(isDatabaseReachable),
     timed(isCacheReachable),
   ]);
+
+  dependencyUp.set({ dependency: 'database' }, database.status === 'up' ? 1 : 0);
+  dependencyUp.set({ dependency: 'cache' }, cache.status === 'up' ? 1 : 0);
 
   return {
     status: database.status === 'up' ? 'healthy' : 'degraded',

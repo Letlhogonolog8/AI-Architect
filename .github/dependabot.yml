@@ -1,0 +1,49 @@
+# Complements .github/workflows/security.yml's weekly `pnpm audit`: audit
+# finds the vulnerable version, Dependabot is what actually opens the PR that
+# bumps it. Grouped and weekly rather than per-package/immediate — a flood of
+# single-package PRs for a monorepo this size trains reviewers to rubber-stamp
+# them, which defeats having a review step at all.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      npm-dependencies:
+        patterns: ['*']
+    open-pull-requests-limit: 10
+
+  - package-ecosystem: pip
+    directory: /services/ai
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      pip-dependencies:
+        patterns: ['*']
+
+  - package-ecosystem: docker
+    directory: /apps/api
+    schedule:
+      interval: weekly
+      day: monday
+
+  - package-ecosystem: docker
+    directory: /apps/web
+    schedule:
+      interval: weekly
+      day: monday
+
+  - package-ecosystem: docker
+    directory: /infra/docker
+    schedule:
+      interval: weekly
+      day: monday
+
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday

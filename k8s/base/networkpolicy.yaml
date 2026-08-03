@@ -1,0 +1,101 @@
+# Default-deny plus explicit allows. Namespaced resources with no matching
+# NetworkPolicy are fully open by default in Kubernetes — this is the
+# belt-and-braces equivalent of the API's own CORS allow-list, applied at the
+# network layer instead of the application layer.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+spec:
+  podSelector: {}
+  policyTypes: ['Ingress', 'Egress']
+  # DNS must stay reachable even under a default deny, or every pod's egress
+  # rules below become moot the moment they try to resolve a hostname.
+  egress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-api
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: api
+  policyTypes: ['Ingress']
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 4000
+    # /metrics lives on the same port as the rest of the API (see
+    # src/observability/metrics.routes.ts) — this is what actually lets the
+    # cluster's Prometheus reach it. The route's own METRICS_TOKEN check is a
+    # second layer, not a substitute for this rule.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 4000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-web
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: web
+  policyTypes: ['Ingress']
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+# The API and every worker talk to the same managed Postgres/Redis and, for
+# the API only, the realtime clients reached through the ingress above. Egress
+# to 0.0.0.0/0 over HTTPS stays open rather than pinned to IPs: managed
+# datastores (RDS, ElastiCache, a KMS endpoint) resolve to addresses the
+# cluster operator does not control and that rotate without notice.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-to-datastores
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values: [api, notifications-worker, telemetry-worker, evidence-worker, postgres-backup]
+  policyTypes: ['Egress']
+  egress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 5432 # PostgreSQL / PgBouncer
+        - protocol: TCP
+          port: 6432 # PgBouncer, when reached directly
+        - protocol: TCP
+          port: 6379 # Redis
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 443

@@ -6,6 +6,7 @@ export * from './cabin';
 export * from './corridor';
 export * from './decision';
 export * from './identity';
+export * from './logging';
 export * from './rbac';
 export * from './recovery';
 export * from './sos';

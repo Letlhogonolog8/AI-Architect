@@ -13,6 +13,8 @@
     "typecheck:ci": "pnpm run typecheck:libs && pnpm -r --filter \"./apps/**\" --filter \"./services/**\" --filter \"./scripts\" --if-present run typecheck",
     "format": "prettier --write \"{apps,packages,services,docs}/**/*.{ts,tsx,json,md,css}\"",
     "format:check": "prettier --check \"{apps,packages,services,docs}/**/*.{ts,tsx,json,md,css}\"",
+    "test": "pnpm -r --if-present run test",
+    "test:ci": "pnpm -r --filter \"./apps/**\" --filter \"./packages/**\" --if-present run test",
     "dev:api": "pnpm --filter @aegisdrive/api run dev",
     "dev:web": "pnpm --filter @aegisdrive/web run dev",
     "db:generate": "pnpm --filter @aegisdrive/api run db:generate",

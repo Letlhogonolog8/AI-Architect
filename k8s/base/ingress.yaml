@@ -1,0 +1,62 @@
+# Assumes an ingress-nginx controller and cert-manager are already installed
+# on the cluster; both are one-time cluster add-ons, not part of this app's
+# manifests. The host and cluster-issuer are placeholders overridden per
+# overlay — see overlays/*/ingress-patch.yaml.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: aegisdrive
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-production
+    nginx.ingress.kubernetes.io/ssl-redirect: 'true'
+    # Ingress-level rate limiting as defense in depth on top of the
+    # application-level limiter in apps/api/src/middleware/rate-limit.middleware.ts
+    # — this one costs nothing extra to bypass a compromised replica and stops
+    # a flood before it ever reaches a pod.
+    nginx.ingress.kubernetes.io/limit-rps: '50'
+    nginx.ingress.kubernetes.io/limit-burst-multiplier: '5'
+    # Socket.IO's long-poll fallback benefits from landing on the same replica
+    # repeatedly; the websocket transport does not need this but is unaffected
+    # by it. Real-time fan-out across replicas still goes through the Redis
+    # adapter regardless of which pod a given client is pinned to.
+    nginx.ingress.kubernetes.io/affinity: cookie
+    nginx.ingress.kubernetes.io/affinity-mode: balanced
+    nginx.ingress.kubernetes.io/proxy-read-timeout: '3600'
+    nginx.ingress.kubernetes.io/proxy-send-timeout: '3600'
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: ['app.aegisdrive.ai']
+      secretName: aegisdrive-tls
+  rules:
+    - host: app.aegisdrive.ai
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: api
+                port:
+                  name: http
+          - path: /realtime
+            pathType: Prefix
+            backend:
+              service:
+                name: api
+                port:
+                  name: http
+          - path: /health
+            pathType: Prefix
+            backend:
+              service:
+                name: api
+                port:
+                  name: http
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  name: http

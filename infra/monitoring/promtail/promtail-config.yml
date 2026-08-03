@@ -1,0 +1,42 @@
+# Local/dev-parity log aggregation. In a real cluster this role is filled by a
+# Promtail or Grafana Alloy DaemonSet reading each node's container log
+# directory — a cluster-wide add-on installed once, not part of this app's own
+# manifests (same reasoning as the ingress controller and cert-manager; see
+# k8s/README.md). This config exists so `docker compose --profile logging up`
+# reproduces the same "search logs across every service by requestId" workflow
+# without a cluster.
+server:
+  http_listen_port: 9080
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # Discovers every container on the compose network via the Docker socket and
+  # ships its stdout — which is exactly where src/core/logger.ts and every
+  # worker's pino logger already write structured JSON. No log file paths to
+  # configure, no format to parse per service.
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: container
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
+        target_label: service
+    pipeline_stages:
+      # Every log line from the API and workers is already a JSON object with a
+      # `level` field (pino's numeric level) — promoting it to a Loki label
+      # makes "show me only errors across every service" a label filter
+      # instead of a full-text scan.
+      - json:
+          expressions:
+            level: level
+            requestId: requestId
+      - labels:
+          level:

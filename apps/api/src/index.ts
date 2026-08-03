@@ -23,6 +23,17 @@ async function bootstrap(): Promise<void> {
 
   const app = createApp();
   const httpServer = createServer(app);
+
+  // Node's default keepAliveTimeout (5s) is shorter than nginx-ingress's
+  // default upstream keepalive timeout (60s) — that mismatch is exactly the
+  // setup that produces intermittent ECONNRESET/502s under load: the ingress
+  // reuses a pooled connection to this pod that Node has already half-closed.
+  // Raising it past the ingress's own upstream timeout is the standard fix.
+  // `headersTimeout` must stay above `keepAliveTimeout` — Node enforces this
+  // at the http.Server level — with headroom for a slow client.
+  httpServer.keepAliveTimeout = 90_000;
+  httpServer.headersTimeout = 95_000;
+
   const io = createRealtimeServer(httpServer);
 
   await new Promise<void>((resolve) => {

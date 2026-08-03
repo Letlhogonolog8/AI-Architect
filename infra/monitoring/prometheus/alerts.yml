@@ -1,0 +1,65 @@
+groups:
+  - name: aegisdrive-api
+    rules:
+      - alert: ApiDown
+        expr: up{job="aegisdrive-api"} == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: 'The API is not responding to scrapes.'
+          description: 'Prometheus has not been able to reach {{ $labels.instance }} for 2 minutes.'
+
+      - alert: ApiHighErrorRate
+        # Ratio of 5xx to all responses over a 5-minute window. Operational 4xx
+        # (bad input, denied permission) are excluded on purpose — they are
+        # expected traffic, not incidents.
+        expr: |
+          sum(rate(aegisdrive_api_http_requests_total{status_code=~"5.."}[5m]))
+            /
+          sum(rate(aegisdrive_api_http_requests_total[5m])) > 0.05
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: 'More than 5% of requests are failing with a 5xx.'
+          description: 'Check recent deploys and src/middleware/error-handler.middleware.ts logs for the non-operational errors driving this.'
+
+      - alert: ApiHighLatencyP95
+        expr: |
+          histogram_quantile(0.95, sum(rate(aegisdrive_api_http_request_duration_seconds_bucket[5m])) by (le, route)) > 1
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: 'p95 latency on {{ $labels.route }} has been above 1s for 10 minutes.'
+          description: 'Check the slow-query log (src/db/prisma.ts logs queries over 200ms) and the dependencyUp gauges before assuming it is CPU-bound.'
+
+      - alert: DatabaseUnreachable
+        expr: aegisdrive_api_dependency_up{dependency="database"} == 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: 'A replica cannot reach PostgreSQL.'
+          description: 'The API reports degraded and returns 503 from /health/ready while this holds — see docs/runbook.md health probes.'
+
+      - alert: CacheUnreachable
+        expr: aegisdrive_api_dependency_up{dependency="cache"} == 0
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: 'A replica cannot reach Redis.'
+          description: 'Rate limiting fails open and realtime fan-out silently degrades to a single replica while this holds — see docs/runbook.md "Realtime shows Offline".'
+
+      - alert: RateLimitRejectionsSpiking
+        expr: sum(rate(aegisdrive_api_rate_limit_rejections_total[5m])) by (bucket) > 10
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: 'Sustained rate limit rejections on the "{{ $labels.bucket }}" bucket.'
+          description: 'Either a client is misbehaving or a legitimate limit needs raising — check which before assuming abuse.'
+
+# Not covered here: EVIDENCE INTEGRITY FAILURE (services/evidence/src/index.ts)
+# has no metric or alert yet — that worker has no HTTP server to scrape and
+# currently only logs the failure. Until it exports one (or ships to a log
+# pipeline with alerting, see docs/logging.md), a corrupted artefact is only
+# visible by reading its logs or querying `Evidence.status = 'CORRUPTED'`
+# directly.
+

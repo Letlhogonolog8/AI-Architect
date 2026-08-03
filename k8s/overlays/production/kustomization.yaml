@@ -1,0 +1,27 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: aegisdrive-production
+
+resources:
+  - ../../base
+  - pdb-notifications.yaml
+
+patches:
+  - path: resources-patch.yaml
+
+images:
+  # CI pins these to the git tag being released — see .github/workflows/release.yml.
+  # `unset` deliberately fails a raw `kubectl apply -k` run against this overlay
+  # without going through the release workflow, rather than silently pulling
+  # :latest into production.
+  - name: ghcr.io/aegisdrive/api
+    newTag: unset
+  - name: ghcr.io/aegisdrive/web
+    newTag: unset
+  - name: ghcr.io/aegisdrive/notifications-worker
+    newTag: unset
+  - name: ghcr.io/aegisdrive/telemetry-worker
+    newTag: unset
+  - name: ghcr.io/aegisdrive/evidence-worker
+    newTag: unset

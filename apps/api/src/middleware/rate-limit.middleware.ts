@@ -4,6 +4,7 @@ import { redis } from '../cache/redis';
 import { env } from '../config/env';
 import { logger } from '../core/logger';
 import { clientIp } from '../core/http';
+import { rateLimitRejectionsTotal } from '../observability/metrics';
 
 export interface RateLimitOptions {
   /** Window length in seconds. */
@@ -50,6 +51,7 @@ export function rateLimit(options: RateLimitOptions = {}): RequestHandler {
       res.setHeader('RateLimit-Reset', String((window + 1) * windowSeconds));
 
       if (count > max) {
+        rateLimitRejectionsTotal.inc({ bucket });
         const retryAfter = (window + 1) * windowSeconds - Math.floor(Date.now() / 1000);
         next(
           new RateLimitError(

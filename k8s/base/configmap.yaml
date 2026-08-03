@@ -1,0 +1,24 @@
+# Non-secret runtime configuration for the API and workers.
+#
+# Mirrors apps/api/.env.example. Anything that must stay private (connection
+# strings, JWT signing secrets) lives in the Secret this ConfigMap is paired
+# with — see secret.example.yaml for the keys the deployments expect and
+# k8s/README.md for how they actually get populated in each cluster.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aegisdrive-config
+data:
+  NODE_ENV: 'production'
+  PORT: '4000'
+  HOST: '0.0.0.0'
+  LOG_LEVEL: 'info'
+  JWT_ISSUER: 'aegisdrive.ai'
+  JWT_AUDIENCE: 'aegisdrive-clients'
+  ACCESS_TOKEN_TTL: '15m'
+  REFRESH_TOKEN_TTL_DAYS: '30'
+  # Overridden per overlay with the environment's real origin(s).
+  CORS_ORIGINS: 'https://app.aegisdrive.ai'
+  RATE_LIMIT_WINDOW_SECONDS: '60'
+  RATE_LIMIT_MAX_REQUESTS: '300'
+  BCRYPT_ROUNDS: '12'

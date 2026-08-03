@@ -1,8 +1,13 @@
 import { pino } from 'pino';
 import { NotificationChannel } from '@aegisdrive/types';
+import { LOG_REDACT_CENSOR, LOG_REDACT_PATHS } from '@aegisdrive/shared';
 import { serviceEnv } from './config';
 
-const logger = pino({ level: serviceEnv.LOG_LEVEL, base: { service: 'notifications:channels' } });
+const logger = pino({
+  level: serviceEnv.LOG_LEVEL,
+  base: { service: 'notifications:channels' },
+  redact: { paths: LOG_REDACT_PATHS, censor: LOG_REDACT_CENSOR },
+});
 
 export interface DeliveryRequest {
   channel: NotificationChannel;
