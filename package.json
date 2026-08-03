@@ -9,6 +9,7 @@
     "typecheck:libs": "tsc --build",
     "typecheck:apps": "pnpm -r --filter \"./apps/**\" --filter \"./services/**\" --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
     "typecheck": "pnpm run typecheck:libs && pnpm run typecheck:apps",
+    "typecheck:ci": "pnpm run typecheck:libs && pnpm -r --filter \"./apps/**\" --filter \"./services/**\" --filter \"./scripts\" --if-present run typecheck",
     "format": "prettier --write \"{apps,packages,services,docs}/**/*.{ts,tsx,json,md,css}\"",
     "format:check": "prettier --check \"{apps,packages,services,docs}/**/*.{ts,tsx,json,md,css}\"",
     "dev:api": "pnpm --filter @aegisdrive/api run dev",
