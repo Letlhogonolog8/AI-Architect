@@ -68,8 +68,14 @@ jobs:
       - name: Typecheck workspace
         run: pnpm run typecheck:ci
 
+      # Scoped past artifacts/** for the same reason as the typecheck step
+      # above: artifacts/mockup-sandbox's vite config requires a PORT env
+      # var CI has no reason to provide, and artifacts/** ships nothing this
+      # platform depends on. Only apps/** and services/** declare a `build`
+      # script at all — the packages/* libraries are consumed as TS source
+      # and covered by `tsc --build` in typecheck:libs.
       - name: Build
-        run: pnpm -r --if-present run build
+        run: pnpm run build:ci
         env:
           # Same-origin at runtime; the ingress routes /api to the API.
           VITE_API_BASE_URL: ''
