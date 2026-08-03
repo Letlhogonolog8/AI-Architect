@@ -103,6 +103,44 @@ export const PERMISSIONS = [
   'corridor:manage',
   'corridor:share-police',
 
+  // Silent Emergency Engine. Split so that the one capability a driver holds is
+  // the one they must — raising the alarm — and every capability that reads or
+  // acts on an alarm stays in the control room.
+  //
+  // `sos:activate` is submit-only, exactly like `behaviour:submit`. A driver can
+  // raise a silent SOS and cannot read one, because a driver who can see "police
+  // dispatched" on their phone is a driver whose captor can see it too. There is
+  // deliberately no driver-held `sos:read`.
+  //
+  // `sos:dispatch` is separate from `sos:manage` because fanning an emergency
+  // out to law enforcement, an armed-response company, a family member and an
+  // insurer transmits a person's live location to outside parties. That is a
+  // heavier act than acknowledging an alarm internally, and it is held by fewer
+  // roles for the same reason `corridor:share-police` is.
+  'sos:activate',
+  'sos:read',
+  'sos:manage',
+  'sos:dispatch',
+
+  // Recovery Mesh. Split so that reading a recovery, running one, feeding it
+  // sightings, and tasking assets to it are separable grants.
+  //
+  // `recovery:track` is the submit capability behind stolen-vehicle tracking —
+  // a plate-camera hit, a partner-network sighting, a witness call. It is
+  // separate from `recovery:read` because the pipelines and service accounts
+  // that feed the track are not the operators who read it. Geofence evaluation
+  // (which records crossings) sits behind it too, since a position check is a
+  // write to the append-only event log.
+  //
+  // `recovery:dispatch` gates the outward acts — assigning searchers and tasking
+  // drones — for the same reason `sos:dispatch` is separate from `sos:manage`:
+  // coordinating other people's assets and vehicles is heavier than editing a
+  // case, and drone tasking touches airspace.
+  'recovery:read',
+  'recovery:manage',
+  'recovery:track',
+  'recovery:dispatch',
+
   'analytics:read',
   'analytics:export',
 

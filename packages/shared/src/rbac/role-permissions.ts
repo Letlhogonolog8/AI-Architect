@@ -62,6 +62,19 @@ const OPERATOR_PERMISSIONS: readonly Permission[] = [
   'corridor:read',
   'corridor:plan',
   'corridor:share-police',
+  // Runs the silent-emergency response: reads activations, takes and stands them
+  // down, and fans them out to police, security, family and the insurer. Does
+  // not hold `sos:activate` — an operator does not covertly trigger from a
+  // cabin; the control room receives, it does not raise.
+  'sos:read',
+  'sos:manage',
+  'sos:dispatch',
+  // Runs vehicle recovery end to end: opens cases, adds sightings, deploys
+  // searchers, draws geofences and tasks aerial support.
+  'recovery:read',
+  'recovery:manage',
+  'recovery:track',
+  'recovery:dispatch',
   'user:read',
   'organization:read',
   'settings:read',
@@ -104,6 +117,18 @@ const SECURITY_PERMISSIONS: readonly Permission[] = [
   'corridor:read',
   'corridor:plan',
   'corridor:share-police',
+  // Armed response is on the receiving end of a dispatch and also runs it: reads
+  // activations, takes them, and fans them out. Same emergency grants as the
+  // operator.
+  'sos:read',
+  'sos:manage',
+  'sos:dispatch',
+  // Armed recovery: same coordination grants as the operator. Interception is
+  // exactly this role's job.
+  'recovery:read',
+  'recovery:manage',
+  'recovery:track',
+  'recovery:dispatch',
   'settings:read',
 ];
 
@@ -144,6 +169,10 @@ const POLICE_PERMISSIONS: readonly Permission[] = [
   // it expires. Deliberately not `corridor:share-police`: the party receiving
   // the visibility must not also be the party authorising it.
   'corridor:read',
+  // Reads recovery cases and the stolen-vehicle track: an officer who might
+  // intercept a stolen vehicle needs to know where it was last seen. Read-only —
+  // an external principal coordinates nothing and cannot alter the track.
+  'recovery:read',
 ];
 
 /**
@@ -174,6 +203,11 @@ const DRIVER_PERMISSIONS: readonly Permission[] = [
   // Reads their own planned route, because a route the driver cannot see is
   // not navigation. Scoped to their own vehicle at the query layer.
   'corridor:read',
+  // Raises a silent SOS, and cannot read one. Submit-only for the same reason
+  // `behaviour:submit` is: a driver who can see the engine's response can also
+  // see when it has responded, and if they are being coerced, so can whoever is
+  // beside them. The alarm goes out; nothing comes back to the cabin.
+  'sos:activate',
 ];
 
 /** Risk and intelligence analyst. Broad read, plus threat model curation. */
@@ -207,6 +241,13 @@ const ANALYST_PERMISSIONS: readonly Permission[] = [
   // exclusion.
   'corridor:read',
   'corridor:manage',
+  // Reads activations to audit the false-alarm rate per activation method — the
+  // number that says whether the dead-man timeout or the duress phrase is firing
+  // on people who are fine. Cannot act on an alarm or dispatch one.
+  'sos:read',
+  // Reads recovery cases to report the fleet's recovery rate and mean time to
+  // recover. Cannot run a recovery or task an asset.
+  'recovery:read',
   'analytics:read',
   'analytics:export',
   'audit:read',

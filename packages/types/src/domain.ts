@@ -22,6 +22,7 @@ import type {
   VehicleType,
 } from './enums';
 import type { Permission } from './auth';
+import type { EvidenceEncryption } from './evidence-vault';
 
 /**
  * Read models returned by the API. These are deliberately *not* the Prisma
@@ -137,6 +138,11 @@ export interface Evidence extends Timestamped, TenantScoped {
   capturedAt: ISODateString;
   sealedAt: ISODateString | null;
   uploadedByUserId: UUID | null;
+  /**
+   * Envelope-encryption metadata, when the artefact is encrypted at rest. A
+   * description of the protection, never the key — see `EvidenceEncryption`.
+   */
+  encryption: EvidenceEncryption | null;
 }
 
 export interface Alert extends Timestamped, TenantScoped {

@@ -27,6 +27,7 @@ export const CacheKey = {
   userPermissions: (userId: string): string => `perm:${userId}`,
   vehicleLastPosition: (vehicleId: string): string => `vehicle:pos:${vehicleId}`,
   fleetSnapshot: (organizationId: string): string => `fleet:snapshot:${organizationId}`,
+  recoveryDashboard: (organizationId: string): string => `recovery:dashboard:${organizationId}`,
   loginAttempts: (email: string): string => `login:attempts:${email.toLowerCase()}`,
   revokedToken: (jti: string): string => `token:revoked:${jti}`,
 } as const;
@@ -34,6 +35,7 @@ export const CacheKey = {
 export const CacheTtlSeconds = {
   userPermissions: 300,
   fleetSnapshot: 15,
+  recoveryDashboard: 15,
   vehicleLastPosition: 3600,
   loginAttempts: 900,
 } as const;

@@ -215,6 +215,120 @@ enum AuditAction {
   IMMOBILISE
 }
 
+enum SosActivationMethod {
+  HIDDEN_BUTTON
+  DURESS_PIN
+  DURESS_PHRASE
+  POWER_BUTTON_SEQUENCE
+  APP_GESTURE
+  WEARABLE
+  DEADMAN
+  DECISION_ENGINE
+}
+
+enum SosStatus {
+  ACTIVATED
+  DISPATCHING
+  ACKNOWLEDGED
+  RESOLVED
+  CANCELLED
+  FALSE_ALARM
+}
+
+enum EmergencyChannel {
+  POLICE
+  PRIVATE_SECURITY
+  FAMILY
+  INSURANCE
+}
+
+enum DispatchStatus {
+  PENDING
+  SENT
+  DELIVERED
+  ACKNOWLEDGED
+  FAILED
+  UNCONFIGURED
+  CANCELLED
+}
+
+enum RecoveryStatus {
+  OPEN
+  TRACKING
+  LOCATED
+  INTERCEPTING
+  RECOVERED
+  LOST
+  CLOSED
+  SUSPENDED
+}
+
+enum TrackSource {
+  GPS_TRACKER
+  LICENSE_PLATE_CAMERA
+  CELLULAR
+  AERIAL
+  WITNESS
+  PARTNER_NETWORK
+  MANUAL
+}
+
+enum SearchAssignmentStatus {
+  ASSIGNED
+  ACKNOWLEDGED
+  SEARCHING
+  DIVERTED
+  STOOD_DOWN
+  COMPLETED
+}
+
+enum GeofenceKind {
+  CONTAINMENT
+  EXCLUSION
+  CORRIDOR
+  STAGING
+  ALERT
+}
+
+enum GeofenceTrigger {
+  ENTER
+  EXIT
+  DWELL
+  ENTER_EXIT
+}
+
+enum GeofenceEventType {
+  ENTER
+  EXIT
+  DWELL
+}
+
+enum DroneObjective {
+  LOCATE
+  TRACK
+  CONFIRM
+  OVERWATCH
+  CORRIDOR_SCAN
+}
+
+enum DroneTaskStatus {
+  REQUESTED
+  UNAVAILABLE
+  ACCEPTED
+  LAUNCHED
+  ON_STATION
+  RETURNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum SignatureStatus {
+  UNSIGNED
+  SIGNED
+  INVALID
+}
+
 // ============================================================================
 // Tenancy and identity
 // ============================================================================
@@ -231,15 +345,15 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users         User[]
-  vehicles      Vehicle[]
-  drivers       Driver[]
-  incidents     Incident[]
-  evidence      Evidence[]
-  alerts        Alert[]
-  telemetry     Telemetry[]
-  threatEvents  ThreatEvent[]
-  auditLogs     AuditLog[]
+  users        User[]
+  vehicles     Vehicle[]
+  drivers      Driver[]
+  incidents    Incident[]
+  evidence     Evidence[]
+  alerts       Alert[]
+  telemetry    Telemetry[]
+  threatEvents ThreatEvent[]
+  auditLogs    AuditLog[]
 
   identityEnrolments  IdentityEnrolment[]
   enrolledOccupants   EnrolledOccupant[]
@@ -256,6 +370,19 @@ model Organization {
   routePlans           RoutePlan[]
   routingEquityRecords RoutingEquityRecord[]
   policeRouteShares    PoliceRouteShare[]
+
+  sosActivations      SosActivation[]
+  emergencyDispatches EmergencyDispatch[]
+
+  recoveryCases       RecoveryCase[]
+  recoveryTrackPoints RecoveryTrackPoint[]
+  searchAssignments   SearchAssignment[]
+  geofences           Geofence[]
+  geofenceEvents      GeofenceEvent[]
+  droneTasks          DroneTask[]
+
+  evidenceSeals         EvidenceSeal[]
+  evidenceExportBundles EvidenceExportBundle[]
 
   @@index([isActive])
   @@map("organizations")
@@ -314,10 +441,10 @@ model User {
   driverProfile Driver?
   notifications Notification[]
 
-  assignedIncidents    Incident[] @relation("IncidentAssignee")
-  acknowledgedAlerts   Alert[]    @relation("AlertAcknowledger")
-  uploadedEvidence     Evidence[] @relation("EvidenceUploader")
-  auditLogs            AuditLog[]
+  assignedIncidents  Incident[] @relation("IncidentAssignee")
+  acknowledgedAlerts Alert[]    @relation("AlertAcknowledger")
+  uploadedEvidence   Evidence[] @relation("EvidenceUploader")
+  auditLogs          AuditLog[]
 
   /// Email is unique per tenant, not globally: the same responder may hold
   /// accounts with two client organizations.
@@ -352,10 +479,10 @@ model Session {
   userAgent        String?
   ipAddress        String?
 
-  expiresAt DateTime
-  revokedAt DateTime?
+  expiresAt    DateTime
+  revokedAt    DateTime?
   /// Set when this session was rotated; detects refresh-token replay.
-  replacedById String? @db.Uuid
+  replacedById String?   @db.Uuid
 
   createdAt DateTime @default(now())
 
@@ -405,13 +532,13 @@ model Vehicle {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  assignedDriver Driver?       @relation(fields: [assignedDriverId], references: [id], onDelete: SetNull)
-  incidents      Incident[]
-  evidence       Evidence[]
-  alerts         Alert[]
-  telemetry      Telemetry[]
-  threatEvents   ThreatEvent[]
+  organization        Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assignedDriver      Driver?              @relation(fields: [assignedDriverId], references: [id], onDelete: SetNull)
+  incidents           Incident[]
+  evidence            Evidence[]
+  alerts              Alert[]
+  telemetry           Telemetry[]
+  threatEvents        ThreatEvent[]
   identityAssessments IdentityAssessment[]
 
   behaviourAssessments BehaviourAssessment[]
@@ -419,6 +546,10 @@ model Vehicle {
   cabinDetections      CabinDetection[]
   threatDecisions      ThreatDecision[]
   routePlans           RoutePlan[]
+  sosActivations       SosActivation[]
+  recoveryCases        RecoveryCase[]
+  searchAssignments    SearchAssignment[]
+  geofenceEvents       GeofenceEvent[]
 
   @@unique([organizationId, registrationNumber])
   @@unique([organizationId, vin])
@@ -440,9 +571,9 @@ model Driver {
   licenceExpiresAt DateTime?
   phoneNumber      String
 
-  status DriverStatus @default(OFF_DUTY)
+  status      DriverStatus @default(OFF_DUTY)
   /// 0-100 behavioural safety score. Higher is safer.
-  safetyScore Int @default(100)
+  safetyScore Int          @default(100)
 
   emergencyContactName  String?
   emergencyContactPhone String?
@@ -466,6 +597,7 @@ model Driver {
   cabinBaselines       CabinBaseline[]
   threatDecisions      ThreatDecision[]
   routePlans           RoutePlan[]
+  sosActivations       SosActivation[]
 
   @@unique([organizationId, licenceNumber])
   @@index([organizationId, status])
@@ -513,12 +645,15 @@ model Incident {
   driver       Driver?      @relation(fields: [driverId], references: [id], onDelete: SetNull)
   assignedTo   User?        @relation("IncidentAssignee", fields: [assignedToUserId], references: [id], onDelete: SetNull)
 
-  evidence      Evidence[]
-  alerts        Alert[]
-  threatEvents  ThreatEvent[]
-  notifications Notification[]
-  timeline      IncidentTimelineEntry[]
-  policeRouteShares PoliceRouteShare[]
+  evidence              Evidence[]
+  alerts                Alert[]
+  threatEvents          ThreatEvent[]
+  notifications         Notification[]
+  timeline              IncidentTimelineEntry[]
+  policeRouteShares     PoliceRouteShare[]
+  sosActivations        SosActivation[]
+  recoveryCases         RecoveryCase[]
+  evidenceExportBundles EvidenceExportBundle[]
 
   @@unique([organizationId, reference])
   @@index([organizationId, status, severity])
@@ -573,6 +708,14 @@ model Evidence {
 
   uploadedByUserId String? @db.Uuid
 
+  /// Envelope-encryption metadata for the bytes at rest. `wrappedDataKey` is the
+  /// data key encrypted under a KMS master key — opaque, and useless without the
+  /// KMS. There is no plaintext key column here and there must never be one.
+  encryptionAlgorithm String?
+  encryptionKeyId     String?
+  wrappedDataKey      String?
+  encryptionIv        String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -582,6 +725,7 @@ model Evidence {
   uploadedBy   User?        @relation("EvidenceUploader", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
 
   custodyEvents EvidenceCustodyEvent[]
+  seal          EvidenceSeal?
 
   @@index([organizationId, status])
   @@index([incidentId])
@@ -595,7 +739,7 @@ model EvidenceCustodyEvent {
   id         String @id @default(uuid()) @db.Uuid
   evidenceId String @db.Uuid
 
-  /// `SEALED`, `ACCESSED`, `EXPORTED`, `VERIFIED`, `TRANSFERRED`.
+  /// `SEALED`, `ACCESSED`, `EXPORTED`, `VERIFIED`, `TRANSFERRED`, `SIGNED`.
   action      String
   actorUserId String?  @db.Uuid
   actorEmail  String?
@@ -603,10 +747,94 @@ model EvidenceCustodyEvent {
   notes       String?
   occurredAt  DateTime @default(now())
 
+  /// Tamper-evident chain. `entryHash` is the hash of this event's fields
+  /// together with `prevHash`, the previous link's hash — so a removed or
+  /// altered event breaks every hash after it. Null on legacy events written
+  /// before the chain existed; those are reported as unverifiable, not failures.
+  prevHash  String?
+  entryHash String?
+
   evidence Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
 
   @@index([evidenceId, occurredAt])
   @@map("evidence_custody_events")
+}
+
+/// The cryptographic seal over an artefact, written once when it is sealed.
+///
+/// Separate from the Evidence row because it is the integrity record: a SHA-256
+/// digest over the canonical manifest, and a signature over that digest when a
+/// signer is installed. With none installed, `manifestDigest` is still real and
+/// `signatureStatus` is UNSIGNED — the platform never fabricates a signature
+/// from a key nobody can vouch for.
+model EvidenceSeal {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  evidenceId     String @unique @db.Uuid
+
+  /// SHA-256 hex of the canonical manifest. Always present, always real.
+  manifestDigest  String
+  digestAlgorithm String @default("SHA-256")
+
+  signatureStatus    SignatureStatus @default(UNSIGNED)
+  signature          String?
+  signatureAlgorithm String?
+  signatureKeyId     String?
+  signerProviderId   String?
+  signedAt           DateTime?
+
+  sealedAt  DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  evidence     Evidence     @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, signatureStatus])
+  @@map("evidence_seals")
+}
+
+/// A disclosure of one or more artefacts as a single, signed package.
+///
+/// Append-only, referenced (`EXP-2026-000017`), and self-describing: the
+/// `manifest` captures exactly what was disclosed, to whom and why, and the
+/// digest plus signature let a recipient confirm the package was not altered
+/// after it left. The evidence it lists is referenced by the manifest snapshot
+/// rather than by foreign key — an export is a frozen record of a moment, not a
+/// live view that changes as the underlying rows do.
+model EvidenceExportBundle {
+  id             String  @id @default(uuid()) @db.Uuid
+  organizationId String  @db.Uuid
+  incidentId     String? @db.Uuid
+
+  /// Human-quotable reference, e.g. `EXP-2026-000017`. Unique per tenant.
+  reference String
+
+  /// The full ExportManifest. The disclosed package, verbatim.
+  manifest       Json
+  manifestDigest String
+
+  signatureStatus    SignatureStatus @default(UNSIGNED)
+  signature          String?
+  signatureAlgorithm String?
+  signatureKeyId     String?
+  signerProviderId   String?
+  signedAt           DateTime?
+
+  itemCount Int
+  recipient String
+  reason    String
+  format    String
+
+  exportedByUserId String?  @db.Uuid
+  createdAt        DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  incident     Incident?    @relation(fields: [incidentId], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, reference])
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([incidentId])
+  @@map("evidence_export_bundles")
 }
 
 model Alert {
@@ -656,11 +884,11 @@ model Notification {
   alertId    String? @db.Uuid
   incidentId String? @db.Uuid
 
-  sentAt DateTime?
-  readAt DateTime?
+  sentAt        DateTime?
+  readAt        DateTime?
   /// Populated when `status` is FAILED; drives the retry policy.
   failureReason String?
-  attemptCount  Int     @default(0)
+  attemptCount  Int       @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -727,13 +955,13 @@ model ThreatEvent {
   longitude Float?
   latitude  Float?
 
-  detectedAt DateTime @default(now())
+  detectedAt  DateTime @default(now())
   /// 0-1 model confidence.
-  confidence Float
+  confidence  Float
   /// Producing model and version, e.g. `tailing-v3`. Required for auditability
   /// of automated decisions.
   modelId     String
-  description String  @db.Text
+  description String   @db.Text
 
   acknowledged Boolean @default(false)
 
@@ -753,7 +981,7 @@ model ThreatEvent {
 /// Curated geographic risk areas. Fed by historical incidents and by external
 /// crime intelligence; consumed by the route-risk model.
 model ThreatZone {
-  id             String @id @default(uuid()) @db.Uuid
+  id             String  @id @default(uuid()) @db.Uuid
   organizationId String? @db.Uuid
 
   name        String
@@ -789,7 +1017,7 @@ model AuditLog {
   organizationId String  @db.Uuid
   actorUserId    String? @db.Uuid
 
-  action AuditAction
+  action     AuditAction
   /// Denormalised so the record survives deletion of the user account.
   actorEmail String?
 
@@ -884,12 +1112,12 @@ model IdentityEnrolment {
   status   EnrolmentStatus  @default(PENDING)
 
   /// Opaque handle into the encrypted template store. Never the template.
-  templateRef String
+  templateRef     String
   /// Versioned model that produced it. A model upgrade needs re-enrolment.
   modelId         String
   templateVersion Int    @default(1)
 
-  sampleCount Int @default(0)
+  sampleCount      Int   @default(0)
   /// 0-1 mean sample quality. Gates whether the enrolment may be used at all.
   enrolmentQuality Float @default(0)
 
@@ -960,8 +1188,8 @@ model IdentityAssessment {
   vehicleId String? @db.Uuid
 
   /// 0-100 driver confidence score.
-  confidence Int
-  band       IdentityBand
+  confidence              Int
+  band                    IdentityBand
   /// Fused LLR before mapping to a probability. Retained for audit.
   fusedLogLikelihoodRatio Float
 
@@ -1032,7 +1260,7 @@ model DeviceFingerprint {
   driverId       String? @db.Uuid
 
   /// Stable per-install identifier. Rotates on reinstall, which is detected.
-  installationId String
+  installationId  String
   /// SHA-256 over the stable attribute set. The comparison key.
   fingerprintHash String
 
@@ -1043,14 +1271,14 @@ model DeviceFingerprint {
 
   attestation DeviceAttestation @default(UNSUPPORTED)
   /// Root or jailbreak detected. Downgrades every signal from this device.
-  compromised Boolean @default(false)
+  compromised Boolean           @default(false)
   /// Emulator. In this product that is effectively always an attack.
-  emulated Boolean @default(false)
+  emulated    Boolean           @default(false)
 
   firstSeenAt DateTime @default(now())
   lastSeenAt  DateTime @default(now())
   /// Trusted only after a probation period with no anomalies.
-  trusted Boolean @default(false)
+  trusted     Boolean  @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1155,29 +1383,29 @@ model BehaviourAssessment {
   /// The base rate the PPV was computed against. Recorded because it is a
   /// choice, and a different fleet profile makes the same evidence mean
   /// something different.
-  baseRatePerTripHour Float
+  baseRatePerTripHour     Float
   /// Combined evidence, log10. The score is a display mapping of this.
-  logLikelihoodRatio Float
+  logLikelihoodRatio      Float
 
   /// Per-item breakdown. Required — an unexplainable score is unusable.
-  contributions Json
+  contributions        Json
   /// Evidence classes that contributed. Corroboration is counted from this.
   corroboratingClasses Json
   /// True when the score was held down because all evidence came from one class.
-  corroborationCapped Boolean @default(false)
-  capReason           String?
+  corroborationCapped  Boolean @default(false)
+  capReason            String?
 
   /// Composite physical-activity index, 0-1. NOT an emotion or a stress level.
   arousalIndex      Float?
   arousalConfidence Float?
   /// 0-1 departure from this driver's own behavioural normal.
-  abnormalityScore Float?
+  abnormalityScore  Float?
 
   /// Cabin composition at assessment time. Counts only; nobody is identified.
   occupantCount Int?
   expectedCount Int?
   /// Distinct voices detected. Counted, never identified.
-  speakerCount Int?
+  speakerCount  Int?
 
   /// The identity band at scoring time, when one was available.
   identityBand IdentityBand?
@@ -1195,8 +1423,8 @@ model BehaviourAssessment {
   duressDeliberate Boolean @default(false)
   duressBasis      Json?
 
-  assessedAt    DateTime @default(now())
-  policyVersion String
+  assessedAt        DateTime @default(now())
+  policyVersion     String
   /// Which calibration set produced this score. Assessments must never be
   /// silently made against unfitted numbers.
   calibrationSource String
@@ -1330,12 +1558,12 @@ model CabinSensor {
   label        String
   placement    CameraPlacement
   /// True for a microphone-only device; `placement` is then advisory.
-  audioOnly Boolean @default(false)
+  audioOnly    Boolean         @default(false)
 
-  health SensorHealth @default(UNKNOWN)
-  tamper TamperState  @default(CLEAR)
+  health      SensorHealth @default(UNKNOWN)
+  tamper      TamperState  @default(CLEAR)
   /// 0-1 rolling mean frame quality. Gates whether analysis runs at all.
-  meanQuality Float @default(0)
+  meanQuality Float        @default(0)
 
   analysisEnabled          Boolean @default(true)
   /// Required. Enrolment is refused when false.
@@ -1396,11 +1624,11 @@ model CabinDetection {
   /// Posterior that a weapon is genuinely present, given the base rate. Stored
   /// alongside the confidence and always displayed with it — they differ by two
   /// orders of magnitude and showing only the first produces false certainty.
-  weaponPpv          Float?
-  weaponBaseRate     Float?
+  weaponPpv            Float?
+  weaponBaseRate       Float?
   /// Why the detection should be doubted. Never empty when a candidate exists.
-  weaponCaveats      Json?
-  weaponCorroborated Boolean @default(false)
+  weaponCaveats        Json?
+  weaponCorroborated   Boolean @default(false)
 
   /// The human review. A weapon detection is never a finding of fact without one.
   weaponVerdict      WeaponVerdict?
@@ -1465,7 +1693,7 @@ model ThreatDecision {
   /// incident thresholds are compared against, and those thresholds are
   /// cost-weighted rather than probability-weighted: a phone call about a
   /// possible stroke is worth making at 0.05%, an armed dispatch is not.
-  anomalyProbability Float
+  anomalyProbability   Float
   /// P(leading | evidence, not NORMAL). How clearly this explanation won.
   hypothesisConfidence Float
 
@@ -1476,8 +1704,8 @@ model ThreatDecision {
   /// Epistemic confidence: how good the evidence base was, which is a different
   /// question from how likely the explanation is. Both are stored because
   /// "we are sure nothing is wrong" and "we cannot see" must not render alike.
-  confidenceOverall  Float
-  confidenceDetail   Json
+  confidenceOverall Float
+  confidenceDetail  Json
 
   actions       Json
   autonomyLevel String
@@ -1584,8 +1812,8 @@ model RoadSegment {
   label       String
 
   /// Ordered polyline as GeoJSON coordinates. PostGIS is deferred with the map.
-  geometry     Json
-  lengthMetres Int
+  geometry        Json
+  lengthMetres    Int
   /// Free-flow travel time. The denominator for congestion.
   freeFlowSeconds Int
 
@@ -1622,18 +1850,18 @@ model SegmentHazard {
 
   /// 0-1. Falls with thin observation counts, thin exposure, and biased
   /// sources. Below the policy floor a hazard does not influence routing at all.
-  confidence       Float
-  observationCount Int   @default(0)
+  confidence           Float
+  observationCount     Int   @default(0)
   /// Vehicle-hours the rate was computed against. Without it a rate is
   /// arithmetically enormous and epistemically worthless.
   exposureVehicleHours Float @default(0)
 
-  source HazardSource
+  source                HazardSource
   /// True for sources measuring reporting and policing intensity as much as
   /// crime. Handled by lowering confidence, never by scaling the rate - the
   /// size of the bias is unknown and inventing a correction would substitute a
   /// fabricated number for an honest admission that the figure is soft.
-  reportingBiasPossible Boolean @default(false)
+  reportingBiasPossible Boolean      @default(false)
 
   validFrom      DateTime
   validUntil     DateTime?
@@ -1670,7 +1898,7 @@ model SafeHaven {
   hasLighting            Boolean @default(false)
   hasStandingArrangement Boolean @default(false)
 
-  contactNumber String?
+  contactNumber  String?
   /// When someone last confirmed this place still exists and still qualifies.
   /// A driver sent to a forecourt that closed six months ago is worse off than
   /// one who kept driving, because they arrive believing they are safe.
@@ -1699,19 +1927,19 @@ model RoutePlan {
   driverId       String? @db.Uuid
 
   /// The chosen RouteCandidate, with its legs and per-leg exposure.
-  chosen Json
+  chosen   Json
   /// Alternatives considered, including the fastest. The counterfactual.
   rejected Json
 
   totalTransitSeconds Int
   /// Summed hazard rate times time-on-segment. Around 1e-5 on an urban trip -
   /// displayed as a comparison against the alternative, never as a bare figure.
-  expectedIncidents Float
+  expectedIncidents   Float
   /// Extra travel time against the fastest candidate.
-  detourSeconds Int   @default(0)
-  riskReduction Float @default(0)
+  detourSeconds       Int   @default(0)
+  riskReduction       Float @default(0)
 
-  riskAversion RiskAversion @default(STANDARD)
+  riskAversion                   RiskAversion @default(STANDARD)
   /// Minutes-per-incident trade-off in force. Recorded so a route can be
   /// defended afterwards - changing this value changes which routes are chosen.
   riskAversionMinutesPerIncident Int
@@ -1726,9 +1954,9 @@ model RoutePlan {
   engineVersion           String
   hazardCalibrationSource String
   /// Which road-graph provider produced the candidate paths.
-  providerId String
+  providerId              String
 
-  supersededByPlanId String?  @db.Uuid
+  supersededByPlanId String? @db.Uuid
   supersededReason   String?
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -1760,10 +1988,10 @@ model RoutingEquityRecord {
   organizationId String @db.Uuid
   routePlanId    String @unique @db.Uuid
 
-  destinationCell String
+  destinationCell           String
   /// Fastest-route time. The counterfactual.
-  baselineSeconds Int
-  chosenSeconds   Int
+  baselineSeconds           Int
+  chosenSeconds             Int
   /// The difference. The number that matters.
   detourSecondsAttributable Int
   riskReduction             Float
@@ -1792,19 +2020,19 @@ model PoliceRouteShare {
   id             String  @id @default(uuid()) @db.Uuid
   organizationId String  @db.Uuid
   /// Required. There is no incident-free sharing.
-  incidentId  String  @db.Uuid
-  vehicleId   String  @db.Uuid
-  routePlanId String? @db.Uuid
+  incidentId     String  @db.Uuid
+  vehicleId      String  @db.Uuid
+  routePlanId    String? @db.Uuid
 
   /// The receiving unit or station, as identified by the granting operator.
   recipientReference String
   /// Written justification. Required, and audited.
-  justification String
+  justification      String
 
   grantedByUserId String   @db.Uuid
   grantedAt       DateTime @default(now())
   /// Hard expiry. A grant cannot be open-ended.
-  expiresAt DateTime
+  expiresAt       DateTime
 
   revokedAt       DateTime?
   revokedByUserId String?   @db.Uuid
@@ -1821,4 +2049,346 @@ model PoliceRouteShare {
   @@index([incidentId])
   @@index([vehicleId, grantedAt(sort: Desc)])
   @@map("police_route_shares")
+}
+
+// ============================================================================
+// Silent Emergency Engine
+// ============================================================================
+//
+// The response half of the product at its sharpest point: a person covertly
+// summons help, and the platform reaches the outside parties who can act.
+//
+// The rule that governs both models below: A SILENT ACTIVATION IS SILENT.
+// Nothing here is ever surfaced to the vehicle, and the realtime layer broadcasts
+// these only to the organization room, never a vehicle room — same control as the
+// behaviour engine, for the same reason. An attacker who sees the system react
+// learns the driver triggered something, and the driver pays for that.
+//
+// Two consequences visible in the columns:
+//   * There is no vehicle-side stand-down. `acknowledgedByUserId` and
+//     `resolvedByUserId` are the only actors that move an activation forward, and
+//     they are control-room users. A cancel button in the cabin is the first
+//     thing a captor forces the driver to press.
+//   * A dispatch to a channel with no installed provider is UNCONFIGURED, never
+//     SENT. The platform does not record a delivery it did not make.
+//
+// See docs/adr/0012-silent-emergency-engine.md.
+
+/// A silent SOS activation.
+///
+/// The activation *fact* is immutable; `status` advances forward-only through
+/// handling, like an incident's. A `FALSE_ALARM` disposition never deletes the
+/// row — the record of every trigger, including the mistaken ones, is how the
+/// false-alarm rate per method is ever measured.
+model SosActivation {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+
+  vehicleId String? @db.Uuid
+  driverId  String? @db.Uuid
+
+  method SosActivationMethod
+  status SosStatus           @default(ACTIVATED)
+
+  /// Always true in this build. A field rather than an assumption so a future
+  /// non-covert path is a visible schema change, not a flipped default.
+  covert Boolean @default(true)
+
+  longitude Float?
+  latitude  Float?
+
+  /// 0-1, only for DECISION_ENGINE activations. Null when a person triggered it.
+  confidence Float?
+  /// Provenance of the trigger, e.g. `mobile-app`, `decision-engine-v2`.
+  source     String
+
+  /// The CRITICAL incident opened for this activation.
+  incidentId String? @db.Uuid
+
+  activatedAt          DateTime  @default(now())
+  acknowledgedAt       DateTime?
+  acknowledgedByUserId String?   @db.Uuid
+  resolvedAt           DateTime?
+  resolvedByUserId     String?   @db.Uuid
+  dispositionNote      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  vehicle      Vehicle?     @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  driver       Driver?      @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  incident     Incident?    @relation(fields: [incidentId], references: [id], onDelete: SetNull)
+
+  dispatches EmergencyDispatch[]
+
+  @@index([organizationId, status, activatedAt(sort: Desc)])
+  @@index([organizationId, activatedAt(sort: Desc)])
+  @@index([vehicleId, activatedAt(sort: Desc)])
+  @@index([organizationId, method])
+  @@map("sos_activations")
+}
+
+/// One attempt to reach one external party about one activation.
+///
+/// `payload` is the exact minimised content transmitted, retained because a
+/// dispatch to law enforcement or an insurer may be examined later and "we told
+/// them" is not an answer. It carries a position, a vehicle reference and an
+/// incident reference — never the driver's identity, biometric state or
+/// behaviour assessment. A police intercept needs to know where the car is, not
+/// who the engine thinks is driving it.
+model EmergencyDispatch {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  activationId   String @db.Uuid
+
+  channel EmergencyChannel
+  status  DispatchStatus   @default(PENDING)
+
+  /// The receiving unit, company, contact or insurer, as the operator names it.
+  recipientReference String
+  /// The endpoint used — a phone number, a webhook — when one is known.
+  recipientContact   String?
+
+  /// The provider that handled it, e.g. `police-webhook-v1`. Null when none.
+  providerId        String?
+  /// The reference the recipient returned, e.g. a case number.
+  externalReference String?
+
+  /// Exactly what was transmitted. Minimised; see the model doc.
+  payload Json
+
+  attemptCount   Int       @default(0)
+  lastAttemptAt  DateTime?
+  sentAt         DateTime?
+  acknowledgedAt DateTime?
+  failureReason  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  activation   SosActivation @relation(fields: [activationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@index([activationId])
+  @@index([organizationId, channel])
+  @@map("emergency_dispatches")
+}
+
+// ============================================================================
+// Recovery Mesh
+// ============================================================================
+//
+// What the platform does after a vehicle is already gone: coordinate getting it
+// back. A theft that reaches VehicleStatus.STOLEN opens a RecoveryCase, and the
+// track, searchers, geofences and drone tasks all hang off it.
+//
+// Two rules govern the models below:
+//   * THE TRACK IS EVIDENCE. RecoveryTrackPoint and GeofenceEvent are append-only
+//     — a sighting or a crossing, once recorded, is never edited or deleted. It
+//     may be produced in a prosecution or an insurance claim, and an editable
+//     track is worthless there.
+//   * AERIAL SUPPORT IS ARCHITECTURE. With no drone provider installed — which is
+//     every deployment in this build — a DroneTask lands in UNAVAILABLE, never a
+//     fabricated LAUNCHED. Flying over a moving vehicle is a regulated BVLOS
+//     operation this repository does not ship.
+//
+// See docs/adr/0013-recovery-mesh.md.
+
+/// A recovery operation for one stolen vehicle.
+///
+/// The denormalised lastKnown* columns hold the most recent trusted fix so the
+/// dashboard and map render without scanning the whole track; the authoritative
+/// history is the append-only RecoveryTrackPoint series.
+model RecoveryCase {
+  id             String  @id @default(uuid()) @db.Uuid
+  organizationId String  @db.Uuid
+  vehicleId      String  @db.Uuid
+  incidentId     String? @db.Uuid
+
+  /// Human-quotable reference, e.g. `REC-2026-000042`. Unique per tenant.
+  reference String
+
+  status   RecoveryStatus   @default(OPEN)
+  /// Reuses the incident severity ladder.
+  priority IncidentSeverity @default(HIGH)
+
+  lastKnownLongitude Float?
+  lastKnownLatitude  Float?
+  lastSeenAt         DateTime?
+
+  openedByUserId String?   @db.Uuid
+  openedAt       DateTime  @default(now())
+  recoveredAt    DateTime?
+  closedAt       DateTime?
+
+  recoveredLongitude Float?
+  recoveredLatitude  Float?
+  outcome            String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  vehicle      Vehicle      @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  incident     Incident?    @relation(fields: [incidentId], references: [id], onDelete: SetNull)
+
+  track      RecoveryTrackPoint[]
+  searchers  SearchAssignment[]
+  geofences  Geofence[]
+  droneTasks DroneTask[]
+
+  @@unique([organizationId, reference])
+  @@index([organizationId, status, openedAt(sort: Desc)])
+  @@index([organizationId, openedAt(sort: Desc)])
+  @@index([vehicleId])
+  @@map("recovery_cases")
+}
+
+/// One recorded sighting on a recovery track. Append-only.
+model RecoveryTrackPoint {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  recoveryCaseId String @db.Uuid
+
+  longitude      Float
+  latitude       Float
+  heading        Float?
+  speedKph       Float?
+  accuracyMetres Float?
+
+  source     TrackSource
+  /// 0-1 confidence this is genuinely the vehicle. A witness plate is not a GPS fix.
+  confidence Float
+  note       String?
+
+  recordedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  recoveryCase RecoveryCase @relation(fields: [recoveryCaseId], references: [id], onDelete: Cascade)
+
+  @@index([recoveryCaseId, recordedAt(sort: Desc)])
+  @@index([organizationId, recordedAt(sort: Desc)])
+  @@map("recovery_track_points")
+}
+
+/// A searcher tasked to a recovery, and the sector it was given.
+///
+/// A searcher is either one of the operator's own fleet vehicles or an external
+/// unit named in `searcherReference`. The sector is a circle — PostGIS is
+/// deferred with the map.
+model SearchAssignment {
+  id                String  @id @default(uuid()) @db.Uuid
+  organizationId    String  @db.Uuid
+  recoveryCaseId    String  @db.Uuid
+  searcherVehicleId String? @db.Uuid
+
+  searcherReference String
+
+  status SearchAssignmentStatus @default(ASSIGNED)
+
+  sectorCentreLongitude Float?
+  sectorCentreLatitude  Float?
+  sectorRadiusMetres    Int?
+
+  assignedByUserId String?  @db.Uuid
+  assignedAt       DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  notes            String?
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  recoveryCase    RecoveryCase @relation(fields: [recoveryCaseId], references: [id], onDelete: Cascade)
+  searcherVehicle Vehicle?     @relation(fields: [searcherVehicleId], references: [id], onDelete: SetNull)
+
+  @@index([recoveryCaseId, status])
+  @@index([organizationId, status])
+  @@map("search_assignments")
+}
+
+/// A circular geofence, optionally bound to a recovery case.
+model Geofence {
+  id             String  @id @default(uuid()) @db.Uuid
+  organizationId String  @db.Uuid
+  recoveryCaseId String? @db.Uuid
+
+  name    String
+  kind    GeofenceKind
+  trigger GeofenceTrigger @default(ENTER_EXIT)
+
+  centreLongitude Float
+  centreLatitude  Float
+  radiusMetres    Int
+
+  isActive  Boolean   @default(true)
+  expiresAt DateTime?
+
+  createdByUserId String?  @db.Uuid
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  recoveryCase RecoveryCase? @relation(fields: [recoveryCaseId], references: [id], onDelete: SetNull)
+
+  events GeofenceEvent[]
+
+  @@index([organizationId, isActive])
+  @@index([recoveryCaseId])
+  @@map("geofences")
+}
+
+/// A recorded geofence crossing. Append-only.
+model GeofenceEvent {
+  id             String  @id @default(uuid()) @db.Uuid
+  organizationId String  @db.Uuid
+  geofenceId     String  @db.Uuid
+  vehicleId      String? @db.Uuid
+
+  type      GeofenceEventType
+  longitude Float
+  latitude  Float
+
+  occurredAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  geofence     Geofence     @relation(fields: [geofenceId], references: [id], onDelete: Cascade)
+  vehicle      Vehicle?     @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+
+  @@index([geofenceId, occurredAt(sort: Desc)])
+  @@index([organizationId, occurredAt(sort: Desc)])
+  @@map("geofence_events")
+}
+
+/// A request for aerial support on a recovery.
+///
+/// Architecture, not a live capability. With no provider installed the task is
+/// recorded as UNAVAILABLE, never a fabricated launch. See the section header.
+model DroneTask {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  recoveryCaseId String @db.Uuid
+
+  droneReference String
+  objective      DroneObjective
+  status         DroneTaskStatus @default(REQUESTED)
+
+  targetLongitude Float?
+  targetLatitude  Float?
+
+  providerId        String?
+  externalReference String?
+  failureReason     String?
+
+  requestedByUserId String?  @db.Uuid
+  requestedAt       DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  recoveryCase RecoveryCase @relation(fields: [recoveryCaseId], references: [id], onDelete: Cascade)
+
+  @@index([recoveryCaseId, status])
+  @@index([organizationId, status])
+  @@map("drone_tasks")
 }

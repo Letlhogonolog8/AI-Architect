@@ -1,9 +1,17 @@
 import { randomUUID } from 'node:crypto';
-import type { AuthUser, Evidence, Paginated } from '@aegisdrive/types';
-import { AuditAction, EvidenceStatus } from '@aegisdrive/types';
-import { ConflictError, NotFoundError, normalisePagination, paginate } from '@aegisdrive/shared';
+import type { AuthUser, CustodyEvent, Evidence, Paginated } from '@aegisdrive/types';
+import { AuditAction, EvidenceStatus, SignatureStatus } from '@aegisdrive/types';
+import {
+  ConflictError,
+  NotFoundError,
+  buildEvidenceManifest,
+  manifestPayload,
+  normalisePagination,
+  paginate,
+} from '@aegisdrive/shared';
 import { moduleLogger } from '../../core/logger';
 import { getContext } from '../../core/request-context';
+import { activeSignerInfo, sha256Hex, signDigest } from '../../core/crypto';
 import { recordAudit } from '../audit-logs/audit.service';
 import {
   appendCustodyEvent,
@@ -13,7 +21,9 @@ import {
   insertEvidence,
   updateEvidenceById,
 } from './evidence.repository';
+import { upsertSeal } from './vault.repository';
 import { toEvidenceDto } from './evidence.mapper';
+import { toCustodyEventDto } from './vault.mapper';
 import type {
   ExportEvidenceInput,
   ListEvidenceQuery,
@@ -93,6 +103,14 @@ export async function registerEvidence(
     durationSeconds: input.durationSeconds ?? null,
     checksum: input.checksum,
     capturedAt,
+    ...(input.encryption
+      ? {
+          encryptionAlgorithm: input.encryption.algorithm,
+          encryptionKeyId: input.encryption.keyId,
+          wrappedDataKey: input.encryption.wrappedDataKey,
+          encryptionIv: input.encryption.iv ?? null,
+        }
+      : {}),
     ...(input.incidentId ? { incident: { connect: { id: input.incidentId } } } : {}),
     ...(input.vehicleId ? { vehicle: { connect: { id: input.vehicleId } } } : {}),
     uploadedBy: { connect: { id: user.id } },
@@ -154,9 +172,10 @@ export async function sealEvidence(
     );
   }
 
+  const sealedAt = new Date();
   const row = await updateEvidenceById(user.organizationId, evidenceId, {
     status: EvidenceStatus.SEALED,
-    sealedAt: new Date(),
+    sealedAt,
   });
 
   if (!row) throw new NotFoundError('Evidence', evidenceId);
@@ -169,6 +188,55 @@ export async function sealEvidence(
     ipAddress: getContext()?.ipAddress ?? null,
   });
 
+  // The cryptographic seal: a SHA-256 digest over the canonical manifest, signed
+  // when a signer is installed. With none, the digest is real and the signature
+  // status is UNSIGNED — never a fabricated signature. A signing failure must not
+  // fail the seal, so it degrades to UNSIGNED and is logged.
+  const manifest = buildEvidenceManifest({
+    evidenceId: row.id,
+    organizationId: row.organizationId,
+    type: row.type,
+    label: row.label,
+    mimeType: row.mimeType,
+    sizeBytes: Number(row.sizeBytes),
+    checksum: row.checksum,
+    capturedAt: row.capturedAt.toISOString(),
+    storageKey: row.storageKey,
+    encryption:
+      row.encryptionAlgorithm && row.encryptionKeyId
+        ? { algorithm: row.encryptionAlgorithm, keyId: row.encryptionKeyId }
+        : null,
+  });
+  const manifestDigest = sha256Hex(manifestPayload(manifest));
+
+  let signature: Awaited<ReturnType<typeof signDigest>> = null;
+  try {
+    signature = await signDigest(manifestDigest);
+  } catch (error) {
+    log.error({ err: error, evidenceId }, 'Evidence signing failed; sealing UNSIGNED');
+  }
+
+  await upsertSeal(user.organizationId, evidenceId, {
+    manifestDigest,
+    signatureStatus: signature ? SignatureStatus.SIGNED : SignatureStatus.UNSIGNED,
+    signature: signature?.signature ?? null,
+    signatureAlgorithm: signature?.algorithm ?? null,
+    signatureKeyId: signature?.keyId ?? null,
+    signerProviderId: signature ? (activeSignerInfo()?.providerId ?? null) : null,
+    signedAt: signature ? sealedAt : null,
+    sealedAt,
+  });
+
+  await appendCustodyEvent({
+    evidenceId,
+    action: 'SIGNED',
+    actorUserId: user.id,
+    actorEmail: user.email,
+    notes: signature
+      ? `Manifest digest signed (${signature.algorithm}).`
+      : 'Manifest digest recorded; UNSIGNED (no signer installed).',
+  });
+
   void recordAudit({
     organizationId: user.organizationId,
     actorUserId: user.id,
@@ -176,7 +244,12 @@ export async function sealEvidence(
     action: AuditAction.UPDATE,
     resourceType: 'evidence',
     resourceId: evidenceId,
-    metadata: { sealed: true, checksum: input.checksum },
+    metadata: {
+      sealed: true,
+      checksum: input.checksum,
+      manifestDigest,
+      signed: signature !== null,
+    },
   });
 
   return toEvidenceDto(row);
@@ -219,32 +292,10 @@ export async function exportEvidence(
   return toEvidenceDto(row);
 }
 
-export interface CustodyEventDto {
-  id: string;
-  action: string;
-  actorUserId: string | null;
-  actorEmail: string | null;
-  ipAddress: string | null;
-  notes: string | null;
-  occurredAt: string;
-}
-
-export async function getCustodyChain(
-  user: AuthUser,
-  evidenceId: string,
-): Promise<CustodyEventDto[]> {
+export async function getCustodyChain(user: AuthUser, evidenceId: string): Promise<CustodyEvent[]> {
   const row = await findEvidenceById(user.organizationId, evidenceId);
   if (!row) throw new NotFoundError('Evidence', evidenceId);
 
   const events = await findCustodyChain(evidenceId);
-
-  return events.map((event) => ({
-    id: event.id,
-    action: event.action,
-    actorUserId: event.actorUserId,
-    actorEmail: event.actorEmail,
-    ipAddress: event.ipAddress,
-    notes: event.notes,
-    occurredAt: event.occurredAt.toISOString(),
-  }));
+  return events.map(toCustodyEventDto);
 }

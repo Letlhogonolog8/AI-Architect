@@ -2,6 +2,8 @@ import type { GeoPosition, ISODateString, UUID } from './common';
 import type { ThreatLevel, VehicleStatus } from './enums';
 import type { Alert, FleetSnapshot, Incident, ThreatEvent } from './domain';
 import type { BehaviourAssessment } from './behaviour';
+import type { EmergencyDispatch, SosActivationDetail } from './sos';
+import type { GeofenceEvent, RecoveryCase, RecoveryTrackPoint } from './recovery';
 import type {
   AIDecision,
   CameraDetection,
@@ -80,6 +82,27 @@ export interface ServerToClientEvents {
   'behaviour:assessed': (payload: BehaviourAssessment) => void;
   'fleet:snapshot': (payload: FleetSnapshot) => void;
   'system:error': (payload: { code: string; message: string }) => void;
+
+  /**
+   * A silent SOS activation and its dispatch fan-out.
+   *
+   * **Broadcast to the organization room only, never to a vehicle room.** Same
+   * control as `behaviour:assessed`, and here it is the sharpest instance of it:
+   * the entire value of a silent SOS is that the cabin does not know it fired, so
+   * this event must never travel down a channel a device in the vehicle could be
+   * subscribed to. Enforced in `emitSosRaised` / `emitSosUpdated`.
+   */
+  'sos:raised': (payload: SosActivationDetail) => void;
+  'sos:updated': (payload: SosActivationDetail) => void;
+  /** A change to a single external dispatch — a case number, a delivery, a failure. */
+  'dispatch:updated': (payload: EmergencyDispatch) => void;
+
+  /** A recovery case opened or advanced. Organization room only. */
+  'recovery:updated': (payload: RecoveryCase) => void;
+  /** A fresh sighting on a recovery track. Organization room only. */
+  'recovery:track': (payload: RecoveryTrackPoint) => void;
+  /** A geofence crossing — a stolen vehicle leaving its containment ring. */
+  'geofence:breach': (payload: GeofenceEvent) => void;
 
   // Command-centre channels. Emitted at a higher rate than the incident events
   // above, and consumed by the SOC dashboard only.

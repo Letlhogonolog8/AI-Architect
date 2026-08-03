@@ -620,6 +620,7 @@ export function generateEvidence(random: RandomHelpers, incidents: Incident[]): 
         capturedAt: incident.detectedAt,
         sealedAt: sealed ? incident.detectedAt : null,
         uploadedByUserId: null,
+        encryption: null,
         createdAt: incident.detectedAt,
         updatedAt: incident.updatedAt,
       } satisfies Evidence;

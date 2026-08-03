@@ -1,7 +1,8 @@
 import type { Evidence, Prisma } from '@prisma/client';
 import type { EvidenceStatus, EvidenceType, PaginationQuery } from '@aegisdrive/types';
-import { toSkipTake } from '@aegisdrive/shared';
+import { custodyPayload, toSkipTake } from '@aegisdrive/shared';
 import { prisma } from '../../db/prisma';
+import { sha256Hex } from '../../core/crypto';
 
 export interface EvidenceFilter extends PaginationQuery {
   organizationId: string;
@@ -66,11 +67,18 @@ export async function updateEvidenceById(
 }
 
 /**
- * Appends to the chain of custody.
+ * Appends to the chain of custody, hash-chained to the previous link.
  *
- * There is no corresponding update or delete, and there must not be. A custody
- * chain with a gap or an edit is inadmissible, so the only supported operation
- * on this table is append.
+ * There is no corresponding update or delete, and there must not be. Beyond
+ * append-only, the chain is now tamper-evident: each event's `entryHash` is the
+ * SHA-256 of its own fields together with the previous event's hash, so removing
+ * or altering any link breaks every hash after it. `occurredAt` is set here
+ * rather than by a database default so the value that is hashed is the value
+ * that is stored.
+ *
+ * Runs in a serialisable transaction: the previous hash must be read and the new
+ * link written atomically, or two concurrent appends could chain off the same
+ * predecessor and fork the chain.
  */
 export async function appendCustodyEvent(input: {
   evidenceId: string;
@@ -80,15 +88,55 @@ export async function appendCustodyEvent(input: {
   ipAddress?: string | null;
   notes?: string | null;
 }): Promise<void> {
-  await prisma.evidenceCustodyEvent.create({
-    data: {
-      evidenceId: input.evidenceId,
-      action: input.action,
-      actorUserId: input.actorUserId ?? null,
-      actorEmail: input.actorEmail ?? null,
-      ipAddress: input.ipAddress ?? null,
-      notes: input.notes ?? null,
+  await prisma.$transaction(
+    async (tx) => {
+      const previous = await tx.evidenceCustodyEvent.findFirst({
+        where: { evidenceId: input.evidenceId },
+        orderBy: { occurredAt: 'desc' },
+        select: { entryHash: true },
+      });
+
+      const prevHash = previous?.entryHash ?? null;
+      const occurredAt = new Date();
+
+      const entryHash = sha256Hex(
+        custodyPayload({
+          prevHash,
+          evidenceId: input.evidenceId,
+          action: input.action,
+          actorUserId: input.actorUserId ?? null,
+          actorEmail: input.actorEmail ?? null,
+          ipAddress: input.ipAddress ?? null,
+          notes: input.notes ?? null,
+          occurredAt: occurredAt.toISOString(),
+        }),
+      );
+
+      await tx.evidenceCustodyEvent.create({
+        data: {
+          evidenceId: input.evidenceId,
+          action: input.action,
+          actorUserId: input.actorUserId ?? null,
+          actorEmail: input.actorEmail ?? null,
+          ipAddress: input.ipAddress ?? null,
+          notes: input.notes ?? null,
+          prevHash,
+          entryHash,
+          occurredAt,
+        },
+      });
     },
+    { isolationLevel: 'Serializable' },
+  );
+}
+
+/** Sealed/verified artefacts by id, tenant-scoped — the inputs to a court bundle. */
+export async function findEvidenceByIds(
+  organizationId: string,
+  evidenceIds: readonly string[],
+): Promise<Evidence[]> {
+  return prisma.evidence.findMany({
+    where: { organizationId, id: { in: [...evidenceIds] } },
   });
 }
 

@@ -4,11 +4,16 @@ import {
   type Alert,
   type BehaviourAssessment,
   type ClientToServerEvents,
+  type EmergencyDispatch,
   type FleetSnapshot,
+  type GeofenceEvent,
   type Incident,
   type InterServerEvents,
+  type RecoveryCase,
+  type RecoveryTrackPoint,
   type ServerToClientEvents,
   type SocketData,
+  type SosActivationDetail,
   type ThreatEvent,
   type VehiclePositionUpdate,
 } from '@aegisdrive/types';
@@ -119,6 +124,52 @@ export function emitBehaviourAssessed(assessment: BehaviourAssessment): void {
 
 export function emitFleetSnapshot(organizationId: string, snapshot: FleetSnapshot): void {
   toOrganization(organizationId, 'fleet:snapshot', snapshot);
+}
+
+/**
+ * Broadcasts a silent SOS activation.
+ *
+ * **Organization room only.** This is the sharpest instance of the same control
+ * as `emitBehaviourAssessed`: the entire value of a silent SOS is that the cabin
+ * does not know it fired. There is deliberately no `toRoom(RealtimeRoom.vehicle(...))`
+ * call here, and adding one — which would let a device inside the vehicle learn
+ * an emergency had been raised — would defeat the whole engine silently. That is
+ * why it is called out rather than left to be noticed.
+ */
+export function emitSosRaised(activation: SosActivationDetail): void {
+  toOrganization(activation.organizationId, 'sos:raised', activation);
+}
+
+/** A change to an activation. Organization room only, for the reason above. */
+export function emitSosUpdated(activation: SosActivationDetail): void {
+  toOrganization(activation.organizationId, 'sos:updated', activation);
+}
+
+/** A change to a single external dispatch. Organization room only. */
+export function emitDispatchUpdated(dispatch: EmergencyDispatch): void {
+  toOrganization(dispatch.organizationId, 'dispatch:updated', dispatch);
+}
+
+/** A recovery case opened or advanced. Organization room only. */
+export function emitRecoveryUpdated(recoveryCase: RecoveryCase): void {
+  toOrganization(recoveryCase.organizationId, 'recovery:updated', recoveryCase);
+}
+
+/**
+ * A fresh sighting on a recovery track. Organization room only.
+ *
+ * Deliberately not emitted to the tracked vehicle's room: the point of a
+ * recovery is that the platform knows where the stolen vehicle is; broadcasting
+ * that on a channel a device in the vehicle could hold would hand the location
+ * back to whoever took it.
+ */
+export function emitRecoveryTrack(point: RecoveryTrackPoint): void {
+  toOrganization(point.organizationId, 'recovery:track', point);
+}
+
+/** A geofence crossing. Organization room only. */
+export function emitGeofenceBreach(event: GeofenceEvent): void {
+  toOrganization(event.organizationId, 'geofence:breach', event);
 }
 
 /** Number of currently connected sockets. Reported by the health endpoint. */

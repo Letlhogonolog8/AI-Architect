@@ -24,6 +24,19 @@ export const listEvidenceQuerySchema = paginationQuerySchema.extend({
  * service verifies the stored object against this value before sealing. A
  * checksum supplied after upload would prove nothing.
  */
+/**
+ * Envelope-encryption metadata, supplied by the capture pipeline when the bytes
+ * are encrypted at rest. `wrappedDataKey` is the data key already wrapped by the
+ * KMS — the API stores it opaquely and never unwraps it. There is deliberately
+ * no field for a plaintext key.
+ */
+const encryptionSchema = z.object({
+  algorithm: z.string().trim().min(2).max(64),
+  keyId: z.string().trim().min(1).max(256),
+  wrappedDataKey: z.string().trim().min(1).max(4_096),
+  iv: z.string().trim().min(1).max(256).nullish(),
+});
+
 export const registerEvidenceSchema = z.object({
   type: enumSchema(EvidenceType),
   label: z.string().trim().min(1).max(160),
@@ -38,6 +51,7 @@ export const registerEvidenceSchema = z.object({
   capturedAt: isoDateSchema,
   incidentId: uuidSchema.nullish(),
   vehicleId: uuidSchema.nullish(),
+  encryption: encryptionSchema.nullish(),
 });
 
 export const sealEvidenceSchema = z.object({

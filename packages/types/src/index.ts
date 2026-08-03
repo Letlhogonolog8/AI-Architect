@@ -8,4 +8,7 @@ export * from './behaviour';
 export * from './cabin';
 export * from './decision';
 export * from './corridor';
+export * from './sos';
+export * from './recovery';
+export * from './evidence-vault';
 export * from './realtime';
