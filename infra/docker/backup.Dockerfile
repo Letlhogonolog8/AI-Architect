@@ -5,7 +5,7 @@
 # whichever object store the deployment target actually uses — see
 # docs/backup-restore.md for why a logical dump is a *supplement* to the
 # managed Postgres provider's own automated snapshots, not a replacement.
-FROM postgres:16-alpine
+FROM postgres:18-alpine
 
 RUN apk add --no-cache rclone bash
 
