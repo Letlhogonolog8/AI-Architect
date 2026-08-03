@@ -39,6 +39,7 @@ mobile app all agreeing on what it means.
 from __future__ import annotations
 
 import math
+from datetime import datetime
 
 import structlog
 
@@ -181,7 +182,7 @@ def analyse_window(
 def derive_motion_signals(
     indicators: list[ArousalIndicator],
     window_seconds: float,
-    observed_at,
+    observed_at: datetime,
     input_quality: float,
 ) -> list[BehaviourObservation]:
     """Promotes sufficiently large motion departures into catalogue signals.

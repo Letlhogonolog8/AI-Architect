@@ -50,6 +50,11 @@ jobs:
 
       - name: Validate Prisma schema
         run: pnpm --filter @aegisdrive/api exec prisma validate
+        env:
+          # `prisma validate` only parses the schema and never connects, but
+          # the CLI's config-loading step still requires every env() reference
+          # to resolve. No real database is needed for this step.
+          DATABASE_URL: postgresql://user:password@localhost:5432/placeholder
 
       - name: Check formatting
         run: pnpm run format:check
@@ -97,6 +102,12 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+
+      # `db:seed` below imports `@prisma/client`, which does not exist until
+      # generated. `migrate deploy` itself only needs the schema, but
+      # generating first keeps both steps working from the same prerequisite.
+      - name: Generate Prisma client
+        run: pnpm --filter @aegisdrive/api run db:generate
 
       - name: Apply migrations
         run: pnpm --filter @aegisdrive/api run db:deploy

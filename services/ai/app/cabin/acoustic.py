@@ -254,4 +254,8 @@ def _blend(*components: float) -> float:
     for component in components:
         product *= max(0.0, min(1.0, component))
 
-    return product ** (1.0 / len(components))
+    # `product` is clamped non-negative above, so this is always a real
+    # result — but `float.__pow__`'s stub allows a complex return for the
+    # general case (a negative base with a fractional exponent), which is why
+    # mypy sees `Any` here without the explicit cast.
+    return float(product ** (1.0 / len(components)))

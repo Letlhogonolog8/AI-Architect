@@ -6,8 +6,8 @@ than a fabricated score — a made-up risk number in a hijacking-prevention
 product is worse than no number, because an operator would act on it.
 """
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
 
 import structlog
 from fastapi import Depends, FastAPI, HTTPException, status

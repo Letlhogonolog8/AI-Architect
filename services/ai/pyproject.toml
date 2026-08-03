@@ -44,10 +44,25 @@ target-version = "py311"
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP", "B", "SIM", "RUF"]
 
+[tool.ruff.lint.flake8-bugbear]
+# `Depends(...)` in an argument default is how FastAPI recognises a dependency
+# — it is the framework's calling convention, not a mutable-default bug.
+# Bugbear does not know that, so it is told explicitly rather than silenced
+# per call site with a `noqa` that would need repeating on every route.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Path", "fastapi.Body"]
+
 [tool.mypy]
 python_version = "3.11"
 strict = true
 warn_unreachable = true
+
+[[tool.mypy.overrides]]
+# Deliberately not installed by the `dev` extra CI typechecks against — see the
+# comment on `[project.optional-dependencies].inference` above. `registry.py`
+# imports it lazily and behind a try/except, so this affects type-checking
+# only, never runtime behaviour.
+module = "onnxruntime"
+ignore_missing_imports = true
 
 [tool.hatch.build.targets.wheel]
 # The project is named `aegisdrive-ai`, which hatchling normalises to

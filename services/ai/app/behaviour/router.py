@@ -117,7 +117,7 @@ async def pose(request: PoseRequest) -> PoseResponse:
     """
     try:
         return await analyse_pose(request)
-    except Exception as error:  # noqa: BLE001 — remapped, then re-raised
+    except Exception as error:  # remapped, then re-raised
         _raise_for(error)
         raise
 
@@ -133,7 +133,7 @@ async def arousal(request: ArousalRequest) -> ArousalResponse:
     """
     try:
         return await analyse_arousal(request)
-    except Exception as error:  # noqa: BLE001
+    except Exception as error:
         _raise_for(error)
         raise
 
@@ -151,7 +151,7 @@ async def voice(request: VoiceStressRequest) -> VoiceStressResponse:
     """
     try:
         return await analyse_voice(request)
-    except Exception as error:  # noqa: BLE001
+    except Exception as error:
         _raise_for(error)
         raise
 
@@ -167,7 +167,7 @@ async def cabin(request: CabinRequest) -> CabinResponse:
     """
     try:
         return await analyse_cabin(request)
-    except Exception as error:  # noqa: BLE001
+    except Exception as error:
         _raise_for(error)
         raise
 

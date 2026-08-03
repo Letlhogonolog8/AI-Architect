@@ -114,7 +114,7 @@ async def objects(request: ObjectDetectionRequest) -> ObjectDetectionResponse:
     """
     try:
         return await detect_objects(request)
-    except Exception as error:  # noqa: BLE001 — remapped, then re-raised
+    except Exception as error:  # remapped, then re-raised
         _raise_for(error)
         raise
 
@@ -132,7 +132,7 @@ async def occupancy(request: OccupancyRequest) -> OccupancyResponse:
     """
     try:
         return await count_occupants(request)
-    except Exception as error:  # noqa: BLE001
+    except Exception as error:
         _raise_for(error)
         raise
 
@@ -150,7 +150,7 @@ async def tamper(request: TamperRequest) -> TamperResponse:
     """
     try:
         return await assess_tamper(request)
-    except Exception as error:  # noqa: BLE001
+    except Exception as error:
         _raise_for(error)
         raise
 
@@ -166,6 +166,6 @@ async def acoustic(request: AcousticRequest) -> AcousticResponse:
     """
     try:
         return await detect_acoustic(request)
-    except Exception as error:  # noqa: BLE001
+    except Exception as error:
         _raise_for(error)
         raise
