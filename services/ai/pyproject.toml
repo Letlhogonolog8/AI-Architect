@@ -49,6 +49,13 @@ python_version = "3.11"
 strict = true
 warn_unreachable = true
 
+[tool.hatch.build.targets.wheel]
+# The project is named `aegisdrive-ai`, which hatchling normalises to
+# `aegisdrive_ai` and expects as a directory at the project root. The actual
+# package is `app/`, so the default file-selection heuristic finds nothing to
+# ship and fails the editable install this CI job depends on.
+packages = ["app"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
