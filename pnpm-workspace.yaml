@@ -109,8 +109,14 @@ onlyBuiltDependencies:
   - unrs-resolver
 
 overrides:
-  # Replit deploys linux-x64, so binaries for other platforms are excluded to
-  # keep the install small.
+  # Deploys are linux-x64, so binaries for other platforms are excluded to keep
+  # the install small.
+  #
+  # "linux-x64" means BOTH libc flavours. The container images build on
+  # node:22-alpine, which is x64 *musl*, so the x64-musl binaries for rollup,
+  # @tailwindcss/oxide and lightningcss are deliberately kept — excluding them
+  # made `vite build` fail inside the web image with a bare "Cannot find module
+  # @rollup/rollup-linux-x64-musl". Only the non-x64 musl targets are dropped.
   #
   # win32-x64 is deliberately NOT excluded, unlike the other non-linux targets.
   # Developers work on Windows, and stripping the win32-x64 binaries for
@@ -149,7 +155,6 @@ overrides:
   "lightningcss>lightningcss-linux-arm-gnueabihf": "-"
   "lightningcss>lightningcss-linux-arm64-gnu": "-"
   "lightningcss>lightningcss-linux-arm64-musl": "-"
-  "lightningcss>lightningcss-linux-x64-musl": "-"
   "lightningcss>lightningcss-win32-arm64-msvc": "-"
   "@tailwindcss/oxide>@tailwindcss/oxide-android-arm64": "-"
   "@tailwindcss/oxide>@tailwindcss/oxide-darwin-arm64": "-"
@@ -159,7 +164,6 @@ overrides:
   "@tailwindcss/oxide>@tailwindcss/oxide-linux-arm64-gnu": "-"
   "@tailwindcss/oxide>@tailwindcss/oxide-linux-arm64-musl": "-"
   "@tailwindcss/oxide>@tailwindcss/oxide-win32-arm64-msvc": "-"
-  "@tailwindcss/oxide>@tailwindcss/oxide-linux-x64-musl": "-"
   "rollup>@rollup/rollup-android-arm-eabi": "-"
   "rollup>@rollup/rollup-android-arm64": "-"
   "rollup>@rollup/rollup-darwin-arm64": "-"
@@ -177,7 +181,6 @@ overrides:
   "rollup>@rollup/rollup-linux-riscv64-gnu": "-"
   "rollup>@rollup/rollup-linux-riscv64-musl": "-"
   "rollup>@rollup/rollup-linux-s390x-gnu": "-"
-  "rollup>@rollup/rollup-linux-x64-musl": "-"
   "rollup>@rollup/rollup-openbsd-x64": "-"
   "rollup>@rollup/rollup-openharmony-arm64": "-"
   "rollup>@rollup/rollup-win32-arm64-msvc": "-"

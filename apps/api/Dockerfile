@@ -42,6 +42,20 @@ RUN pnpm --filter @aegisdrive/api run db:generate \
  && pnpm --filter @aegisdrive/api run typecheck \
  && pnpm --filter @aegisdrive/api run build
 
+# Collect Prisma's runtime into one plain directory for the production stage.
+#
+# pnpm keeps every package in a virtual store and links it into place, so
+# `apps/api/node_modules/@prisma/client` is a symlink and the generated client
+# lands beside it inside the store — there is no `apps/api/node_modules/.prisma`
+# to copy, and COPY cannot follow a symlink out of its source tree anyway.
+# Resolving the link here and dereferencing with `cp -RL` yields a
+# self-contained tree that the production stage takes verbatim.
+RUN CLIENT_DIR="$(readlink -f apps/api/node_modules/@prisma/client)" \
+ && STORE_MODULES="$(dirname "$(dirname "$CLIENT_DIR")")" \
+ && mkdir -p /export/node_modules \
+ && cp -RL "$STORE_MODULES/@prisma" /export/node_modules/@prisma \
+ && cp -RL "$STORE_MODULES/.prisma" /export/node_modules/.prisma
+
 # ------------------------------------------------------------- production
 FROM base AS production
 ENV NODE_ENV=production
@@ -51,8 +65,7 @@ WORKDIR /app
 # and query engine stay external and are copied from the build stage.
 COPY --from=build /repo/apps/api/dist ./dist
 COPY --from=build /repo/apps/api/prisma ./prisma
-COPY --from=build /repo/apps/api/node_modules/.prisma ./node_modules/.prisma
-COPY --from=build /repo/apps/api/node_modules/@prisma ./node_modules/@prisma
+COPY --from=build /export/node_modules ./node_modules
 COPY --from=build /repo/apps/api/package.json ./package.json
 
 # Never run as root. The node image ships an unprivileged `node` user.

@@ -9,8 +9,11 @@ FROM postgres:16-alpine
 
 RUN apk add --no-cache rclone bash
 
-COPY backup.sh /usr/local/bin/backup.sh
-COPY restore.sh /usr/local/bin/restore.sh
+# Paths are relative to the repository root, which is the build context every
+# image here uses (see the `docker` job in .github/workflows/ci.yml). Bare
+# `backup.sh` would only resolve if the context were infra/docker.
+COPY infra/docker/backup.sh /usr/local/bin/backup.sh
+COPY infra/docker/restore.sh /usr/local/bin/restore.sh
 RUN chmod +x /usr/local/bin/backup.sh /usr/local/bin/restore.sh
 
 USER postgres
