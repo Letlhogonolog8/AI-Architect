@@ -5,7 +5,7 @@
   "type": "module",
   "description": "AEGISDRIVE AI control-plane API: REST, realtime and RBAC.",
   "scripts": {
-    "dev": "tsx watch --clear-screen=false src/index.ts",
+    "dev": "tsx watch --clear-screen=false --import ./scripts/load-env.mjs src/index.ts",
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",

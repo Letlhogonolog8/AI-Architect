@@ -55,6 +55,9 @@ jobs:
           # the CLI's config-loading step still requires every env() reference
           # to resolve. No real database is needed for this step.
           DATABASE_URL: postgresql://user:password@localhost:5432/placeholder
+          # The schema's `directUrl` (used for migrations) is a second env()
+          # reference, so it must resolve here too or the step fails to parse.
+          DIRECT_URL: postgresql://user:password@localhost:5432/placeholder
 
       - name: Check formatting
         run: pnpm run format:check
@@ -131,6 +134,9 @@ jobs:
         run: pnpm --filter @aegisdrive/api run db:deploy
         env:
           DATABASE_URL: postgresql://aegis:aegis@localhost:5432/aegisdrive_ci?schema=public
+          # Migrate connects over `directUrl`, not `url`. There is no pooler in
+          # front of the CI Postgres, so both point at the same instance.
+          DIRECT_URL: postgresql://aegis:aegis@localhost:5432/aegisdrive_ci?schema=public
 
       # Reconciling roles is idempotent and runs on every deploy, so it must be
       # proven idempotent here — including on a second run.

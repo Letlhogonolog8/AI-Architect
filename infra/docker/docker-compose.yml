@@ -19,7 +19,13 @@ services:
       # Faster than the default and safe here: this data is disposable.
       POSTGRES_INITDB_ARGS: '--auth-host=scram-sha-256'
     ports:
-      - '5432:5432'
+      # Host-side 5433, not 5432: a native PostgreSQL install already owns
+      # 5432 on developer machines often enough that hardcoding the default
+      # is a routine source of "which database did that just connect to"
+      # confusion. Only the host mapping changes — every service in this
+      # compose file still reaches this one at `postgres:5432` over the
+      # internal Docker network, which is unaffected by the host port.
+      - '5433:5432'
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:

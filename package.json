@@ -20,8 +20,8 @@
     "db:generate": "pnpm --filter @aegisdrive/api run db:generate",
     "db:migrate": "pnpm --filter @aegisdrive/api run db:migrate",
     "db:seed": "pnpm --filter @aegisdrive/api run db:seed",
-    "docker:up": "docker compose -f infra/docker/docker-compose.yml up -d",
-    "docker:down": "docker compose -f infra/docker/docker-compose.yml down"
+    "docker:up": "docker compose --env-file .env -f infra/docker/docker-compose.yml up -d",
+    "docker:down": "docker compose --env-file .env -f infra/docker/docker-compose.yml down"
   },
   "private": true,
   "engines": {

@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Aggregates the telemetry stream and enforces hot-storage retention.",
   "scripts": {
-    "dev": "tsx watch --clear-screen=false src/index.ts",
+    "dev": "tsx watch --clear-screen=false --env-file=.env src/index.ts",
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
