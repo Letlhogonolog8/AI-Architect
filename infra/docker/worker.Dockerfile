@@ -10,7 +10,11 @@
 FROM node:22-alpine AS base
 ENV PNPM_HOME=/pnpm
 ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable
+# Pinned, not floating: bare `corepack enable` resolves pnpm at build time, so
+# the image silently followed pnpm to 11 while CI stayed on 10 — a different
+# package manager than the one the lockfile (lockfileVersion 9.0) was written
+# by. Keep this in step with `version:` in .github/workflows/*.yml.
+RUN corepack enable && corepack prepare pnpm@10.15.0 --activate
 WORKDIR /repo
 
 FROM base AS deps
@@ -33,7 +37,10 @@ COPY packages/ packages/
 # contract between them, so it is generated from the one canonical schema.
 COPY apps/api/prisma/ apps/api/prisma/
 COPY services/${SERVICE_NAME}/ services/${SERVICE_NAME}/
+# See apps/api/Dockerfile: the referenced workspace libraries must be emitted
+# before this service can typecheck against them.
 RUN pnpm --filter @aegisdrive/api exec prisma generate --schema apps/api/prisma/schema.prisma \
+ && pnpm exec tsc --build packages/types packages/shared \
  && pnpm --filter "${SERVICE_PACKAGE}" run typecheck \
  && pnpm --filter "${SERVICE_PACKAGE}" run build
 

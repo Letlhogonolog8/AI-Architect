@@ -7,7 +7,11 @@
 FROM node:22-alpine AS base
 ENV PNPM_HOME=/pnpm
 ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable
+# Pinned, not floating: bare `corepack enable` resolves pnpm at build time, so
+# the image silently followed pnpm to 11 while CI stayed on 10 — a different
+# package manager than the one the lockfile (lockfileVersion 9.0) was written
+# by. Keep this in step with `version:` in .github/workflows/*.yml.
+RUN corepack enable && corepack prepare pnpm@10.15.0 --activate
 WORKDIR /repo
 
 # ------------------------------------------------------------ dependencies
@@ -27,7 +31,14 @@ FROM deps AS build
 COPY tsconfig.base.json tsconfig.json ./
 COPY packages/ packages/
 COPY apps/api/ apps/api/
+# The referenced workspace libraries are composite TypeScript projects, so
+# their .d.ts must be emitted before this app can typecheck against them —
+# otherwise every import fails with TS6305 rather than a real type error.
+# Local runs hide this by leaving packages/*/dist behind from an earlier build.
+# Scoped to this app's own `references`, not the root `typecheck:libs`, which
+# also builds lib/* projects that are deliberately not part of this image.
 RUN pnpm --filter @aegisdrive/api run db:generate \
+ && pnpm exec tsc --build packages/types packages/shared \
  && pnpm --filter @aegisdrive/api run typecheck \
  && pnpm --filter @aegisdrive/api run build
 
