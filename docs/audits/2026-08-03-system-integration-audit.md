@@ -13,18 +13,18 @@
 
 **Real findings:**
 
-| Finding | Evidence | Severity |
-|---|---|---|
-| `lib/db` (`@workspace/db`, Drizzle-based) has zero consumers anywhere in `apps`/`packages`/`services` | `grep -rl "@workspace/db"` → no hits; ADR-0002 confirms "two ORMs coexist during the transition" but the transition finished — everything now uses Prisma | Minor (dead code, safe to delete) |
-| `lib/api-client-react`, `lib/api-zod`, `lib/api-spec` (`@workspace/*`) also have zero consumers | Same grep pattern, zero hits; `apps/web/package.json` depends only on `@aegisdrive/*` | Minor |
-| `pnpm-workspace.yaml` lists `lib/integrations/*` as a package glob — directory doesn't exist | `find lib/integrations` → no such directory | Trivial (dead config) |
-| `@replit/connectors-sdk` in root `package.json` dependencies has zero usages | `grep -rl` across whole repo → no hits | Minor |
-| `artifacts/*` (api-server, command-center, mockup-sandbox) is the legacy Replit prototype, already correctly excluded from CI typecheck/build per ADR-0001 | `.github/workflows/ci.yml` comments confirm this is known and intentional | None — already handled |
-| No circular dependencies found among TS project references (`packages/types` → `packages/shared` → `packages/ui`, `lib/db`, `lib/api-client-react`, `lib/api-zod`) | `tsc --build` (root `typecheck:libs`) builds clean — a cycle would fail this outright | None |
-| No ESLint config anywhere in the platform (`apps/api`, `apps/web`, `packages/*`, `services/*`) | No `.eslintrc`/`eslint.config.*` found; only `apps/mobile/package.json` has a `lint` script (`expo lint`) | Moderate — see Phase 14 |
-| `tsconfig.base.json` sets `noUnusedLocals: false` and has no `noUnusedParameters` | Direct read of the file | Moderate — nothing catches dead variables/imports platform-wide |
-| Environment variables: every app has a matching `.env.example` (root, api, web, mobile) and validates at boot via Zod; no `.env` file is committed | `git ls-files` confirms no committed `.env` | None — correct |
-| TypeScript config is deliberately cherry-picked strict flags, not blanket `"strict": true` (`strictFunctionTypes: false` explicitly) | `tsconfig.base.json` | Informational, not a bug |
+| Finding                                                                                                                                                            | Evidence                                                                                                                                                  | Severity                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `lib/db` (`@workspace/db`, Drizzle-based) has zero consumers anywhere in `apps`/`packages`/`services`                                                              | `grep -rl "@workspace/db"` → no hits; ADR-0002 confirms "two ORMs coexist during the transition" but the transition finished — everything now uses Prisma | Minor (dead code, safe to delete)                               |
+| `lib/api-client-react`, `lib/api-zod`, `lib/api-spec` (`@workspace/*`) also have zero consumers                                                                    | Same grep pattern, zero hits; `apps/web/package.json` depends only on `@aegisdrive/*`                                                                     | Minor                                                           |
+| `pnpm-workspace.yaml` lists `lib/integrations/*` as a package glob — directory doesn't exist                                                                       | `find lib/integrations` → no such directory                                                                                                               | Trivial (dead config)                                           |
+| `@replit/connectors-sdk` in root `package.json` dependencies has zero usages                                                                                       | `grep -rl` across whole repo → no hits                                                                                                                    | Minor                                                           |
+| `artifacts/*` (api-server, command-center, mockup-sandbox) is the legacy Replit prototype, already correctly excluded from CI typecheck/build per ADR-0001         | `.github/workflows/ci.yml` comments confirm this is known and intentional                                                                                 | None — already handled                                          |
+| No circular dependencies found among TS project references (`packages/types` → `packages/shared` → `packages/ui`, `lib/db`, `lib/api-client-react`, `lib/api-zod`) | `tsc --build` (root `typecheck:libs`) builds clean — a cycle would fail this outright                                                                     | None                                                            |
+| No ESLint config anywhere in the platform (`apps/api`, `apps/web`, `packages/*`, `services/*`)                                                                     | No `.eslintrc`/`eslint.config.*` found; only `apps/mobile/package.json` has a `lint` script (`expo lint`)                                                 | Moderate — see Phase 14                                         |
+| `tsconfig.base.json` sets `noUnusedLocals: false` and has no `noUnusedParameters`                                                                                  | Direct read of the file                                                                                                                                   | Moderate — nothing catches dead variables/imports platform-wide |
+| Environment variables: every app has a matching `.env.example` (root, api, web, mobile) and validates at boot via Zod; no `.env` file is committed                 | `git ls-files` confirms no committed `.env`                                                                                                               | None — correct                                                  |
+| TypeScript config is deliberately cherry-picked strict flags, not blanket `"strict": true` (`strictFunctionTypes: false` explicitly)                               | `tsconfig.base.json`                                                                                                                                      | Informational, not a bug                                        |
 
 **Verdict:** mostly clean. The only real action item is deleting four confirmed-dead `@workspace/*` packages and the stale `lib/integrations/*` glob entry — low risk, no dependents.
 
@@ -32,17 +32,17 @@
 
 ## PHASE 2 — Frontend Audit (apps/web, 14 pages)
 
-| Page | Verdict | Note |
-|---|---|---|
-| DashboardPage | CONNECTED | Delegates to Command Centre widget grid + Socket.IO; explicit "Simulation" badge when `VITE_DATA_SOURCE=mock` |
-| VehiclesPage / VehicleDetailPage | CONNECTED | Real `useQuery` + `QueryState` (loading/error/retry) |
-| DriversPage | CONNECTED | Same pattern |
-| IncidentsPage / IncidentDetailPage | CONNECTED | Same pattern |
-| AnalyticsPage, UsersPage, RolesPage, AuditLogsPage | CONNECTED | Same pattern, permission-gated via `Can`/`RequirePermission` |
-| FleetPage | NOT CONNECTED | `PlaceholderPage` — self-documents its own required endpoints (`ws /realtime → vehicle:position`, `/threat-events/zones`), blocked on Mapbox (ADR-0004) |
-| EvidencePage | NOT CONNECTED | `PlaceholderPage`, despite `apps/web/src/data/live-source.ts` already implementing `getRecentEvidence()` — the data layer is ready, the page just isn't wired to it |
-| ThreatIntelligencePage | NOT CONNECTED | `PlaceholderPage` |
-| SettingsPage | PARTIALLY CONNECTED | Real query for `/organization` inside an otherwise placeholder shell |
+| Page                                               | Verdict             | Note                                                                                                                                                                |
+| -------------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| DashboardPage                                      | CONNECTED           | Delegates to Command Centre widget grid + Socket.IO; explicit "Simulation" badge when `VITE_DATA_SOURCE=mock`                                                       |
+| VehiclesPage / VehicleDetailPage                   | CONNECTED           | Real `useQuery` + `QueryState` (loading/error/retry)                                                                                                                |
+| DriversPage                                        | CONNECTED           | Same pattern                                                                                                                                                        |
+| IncidentsPage / IncidentDetailPage                 | CONNECTED           | Same pattern                                                                                                                                                        |
+| AnalyticsPage, UsersPage, RolesPage, AuditLogsPage | CONNECTED           | Same pattern, permission-gated via `Can`/`RequirePermission`                                                                                                        |
+| FleetPage                                          | NOT CONNECTED       | `PlaceholderPage` — self-documents its own required endpoints (`ws /realtime → vehicle:position`, `/threat-events/zones`), blocked on Mapbox (ADR-0004)             |
+| EvidencePage                                       | NOT CONNECTED       | `PlaceholderPage`, despite `apps/web/src/data/live-source.ts` already implementing `getRecentEvidence()` — the data layer is ready, the page just isn't wired to it |
+| ThreatIntelligencePage                             | NOT CONNECTED       | `PlaceholderPage`                                                                                                                                                   |
+| SettingsPage                                       | PARTIALLY CONNECTED | Real query for `/organization` inside an otherwise placeholder shell                                                                                                |
 
 **Routing/nav:** all 14 pages reachable, lazy-loaded, guarded by `RequirePermission` matching real permission strings. Sidebar collapses empty sections rather than showing dead links.
 
@@ -55,6 +55,7 @@
 ## PHASE 3 — Backend Audit (21 modules)
 
 **Structural findings (apply uniformly, zero exceptions across all 21 modules):**
+
 - Every route: `authenticate` + explicit `requirePermissions`/`requireRoles`. Zero unguarded routes.
 - Every mutating route: `validate({ body/params/query })`. No exceptions.
 - Rate limiting: `authRateLimit` on login/refresh; `ingestRateLimit` on telemetry/behaviour/cabin/identity device ingest; global `rateLimit()` everywhere else.
@@ -109,18 +110,18 @@ Dashboard shell is real and live-data-driven, but Tactical Map (FleetPage) and c
 
 ## PHASE 8 — Mobile Application
 
-| Capability | Verdict |
-|---|---|
-| Authentication | CONNECTED |
-| Vehicle status | CONNECTED |
-| **SafeCorridor** | **BROKEN — confirmed 404 + 403.** Calls `GET /corridors` (backend mounts `/corridor`, real paths are `/corridor/plans`, `/corridor/havens/nearest`). Even fixed, `/threat-events/zones` requires `threat:read`, which `DRIVER_PERMISSIONS` does not grant. |
+| Capability                    | Verdict                                                                                                                                                                                                                                                                                                                                                      |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Authentication                | CONNECTED                                                                                                                                                                                                                                                                                                                                                    |
+| Vehicle status                | CONNECTED                                                                                                                                                                                                                                                                                                                                                    |
+| **SafeCorridor**              | **BROKEN — confirmed 404 + 403.** Calls `GET /corridors` (backend mounts `/corridor`, real paths are `/corridor/plans`, `/corridor/havens/nearest`). Even fixed, `/threat-events/zones` requires `threat:read`, which `DRIVER_PERMISSIONS` does not grant.                                                                                                   |
 | **Silent SOS / panic button** | **CRITICAL — bypasses the purpose-built engine entirely.** `panic.ts`/`sync.ts` post to `POST /incidents`, not the dedicated `POST /sos/activations` (which the driver role already holds `sos:activate` for, specifically designed to return a neutral 202 "nothing comes back to the cabin" receipt). Zero references to `/sos` anywhere in mobile source. |
-| Evidence upload | PARTIALLY CONNECTED — metadata registers (`POST /evidence`), byte upload never implemented on either side (consistent with the backend's own known gap) |
-| Push notifications | NOT CONNECTED — `expo-notifications` installed, zero imports anywhere |
-| Emergency contacts | NOT CONNECTED — 100% local SQLite; backend only has a single contact field per driver, a schema mismatch even if wired |
-| Voice trigger | Honest stub — explicitly reports unavailability (no wake-word module in managed Expo), not faked |
-| Offline mode | CONNECTED, best-built subsystem — real priority outbox queue, SOS drains first, correct retry/permanent-failure handling |
-| Device fingerprinting | CONNECTED |
+| Evidence upload               | PARTIALLY CONNECTED — metadata registers (`POST /evidence`), byte upload never implemented on either side (consistent with the backend's own known gap)                                                                                                                                                                                                      |
+| Push notifications            | NOT CONNECTED — `expo-notifications` installed, zero imports anywhere                                                                                                                                                                                                                                                                                        |
+| Emergency contacts            | NOT CONNECTED — 100% local SQLite; backend only has a single contact field per driver, a schema mismatch even if wired                                                                                                                                                                                                                                       |
+| Voice trigger                 | Honest stub — explicitly reports unavailability (no wake-word module in managed Expo), not faked                                                                                                                                                                                                                                                             |
+| Offline mode                  | CONNECTED, best-built subsystem — real priority outbox queue, SOS drains first, correct retry/permanent-failure handling                                                                                                                                                                                                                                     |
+| Device fingerprinting         | CONNECTED                                                                                                                                                                                                                                                                                                                                                    |
 
 **This is the most safety-critical finding in the entire audit: the mobile panic button does not trigger the Silent SOS system.**
 
@@ -130,15 +131,15 @@ Dashboard shell is real and live-data-driven, but Tactical Map (FleetPage) and c
 
 `services/ai` (Python gateway) is still not integrated — no Dockerfile, `AI_SERVICE_URL` unset. `decision.routes.ts`'s own comment confirms the architecture assumes this gateway will call the pipeline; it doesn't exist yet, so every stage below is exercised only by direct API calls today.
 
-| Engine | Confidence score? | Read downstream? |
-|---|---|---|
-| Continuous Identity | Yes (LLR fusion) | No — `decision.service.ts` hardcodes `identityConfidence: null` even though the field exists for it |
-| Behaviour Intelligence | Yes | Yes, but only by itself (see below) |
-| Cabin Intelligence | Yes (weapon verdict) | No — `ContextualEvidence` exists in `DecideInput` specifically for cabin signals; `runDecision` never populates it |
-| Threat Decision Engine | Yes (posteriors) | Yes for incident-opening only |
-| SafeCorridor | Implicit | No incident/decision linkage at all |
-| Recovery Mesh | N/A | Standalone, no incident linkage |
-| Evidence | N/A (integrity) | Reads incidents only when building an export bundle on request |
+| Engine                 | Confidence score?    | Read downstream?                                                                                                   |
+| ---------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Continuous Identity    | Yes (LLR fusion)     | No — `decision.service.ts` hardcodes `identityConfidence: null` even though the field exists for it                |
+| Behaviour Intelligence | Yes                  | Yes, but only by itself (see below)                                                                                |
+| Cabin Intelligence     | Yes (weapon verdict) | No — `ContextualEvidence` exists in `DecideInput` specifically for cabin signals; `runDecision` never populates it |
+| Threat Decision Engine | Yes (posteriors)     | Yes for incident-opening only                                                                                      |
+| SafeCorridor           | Implicit             | No incident/decision linkage at all                                                                                |
+| Recovery Mesh          | N/A                  | Standalone, no incident linkage                                                                                    |
+| Evidence               | N/A (integrity)      | Reads incidents only when building an export bundle on request                                                     |
 
 **The requested incident chain, arrow by arrow:**
 
@@ -172,18 +173,18 @@ Encryption (envelope, per-artefact), SHA-256 manifest digest, and the tamper-evi
 
 ## PHASE 12 — Security Audit
 
-| Area | Finding |
-|---|---|
-| JWT | Separate access/refresh secrets (enforced distinct in production by env validation), `typ` claim double-checked, issuer/audience checked. **Gap:** `jwt.verify()` doesn't pin `algorithms: ['HS256']` explicitly — not currently exploitable (no RSA keys in the system), but a best-practice gap and cheap to close. |
-| Secrets | No `.env` committed; gitleaks scans full git history in CI; JWT/DB/Redis secrets validated at boot, never logged (shared redaction list across API + all 3 workers). |
-| Passwords | bcrypt, configurable cost (12 default). |
-| HTTPS/HSTS | Enforced at ingress + app layer; web origin now also sends HSTS. |
-| Rate limiting | Global + auth-specific + ingest-specific, fails open on Redis loss (deliberate, documented). |
-| CORS | Allow-list only, wildcard rejected in production by env schema. |
-| SQL injection | Zero raw-SQL string interpolation found; the only 2 `$queryRaw` call sites use tagged templates (parameterized), both safe. |
-| XSS | Zero `dangerouslySetInnerHTML` anywhere in web or mobile source. |
-| CSRF | Refresh-token cookie is `httpOnly`, `secure` (prod), `sameSite: lax` — adequate given every other route uses a bearer token (not ambient cookie auth). |
-| Authorization | Zero unguarded routes across all 21 backend modules. |
+| Area          | Finding                                                                                                                                                                                                                                                                                                               |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| JWT           | Separate access/refresh secrets (enforced distinct in production by env validation), `typ` claim double-checked, issuer/audience checked. **Gap:** `jwt.verify()` doesn't pin `algorithms: ['HS256']` explicitly — not currently exploitable (no RSA keys in the system), but a best-practice gap and cheap to close. |
+| Secrets       | No `.env` committed; gitleaks scans full git history in CI; JWT/DB/Redis secrets validated at boot, never logged (shared redaction list across API + all 3 workers).                                                                                                                                                  |
+| Passwords     | bcrypt, configurable cost (12 default).                                                                                                                                                                                                                                                                               |
+| HTTPS/HSTS    | Enforced at ingress + app layer; web origin now also sends HSTS.                                                                                                                                                                                                                                                      |
+| Rate limiting | Global + auth-specific + ingest-specific, fails open on Redis loss (deliberate, documented).                                                                                                                                                                                                                          |
+| CORS          | Allow-list only, wildcard rejected in production by env schema.                                                                                                                                                                                                                                                       |
+| SQL injection | Zero raw-SQL string interpolation found; the only 2 `$queryRaw` call sites use tagged templates (parameterized), both safe.                                                                                                                                                                                           |
+| XSS           | Zero `dangerouslySetInnerHTML` anywhere in web or mobile source.                                                                                                                                                                                                                                                      |
+| CSRF          | Refresh-token cookie is `httpOnly`, `secure` (prod), `sameSite: lax` — adequate given every other route uses a bearer token (not ambient cookie auth).                                                                                                                                                                |
+| Authorization | Zero unguarded routes across all 21 backend modules.                                                                                                                                                                                                                                                                  |
 
 **Verdict:** strong baseline; one real, low-effort fix (JWT algorithm pinning).
 
@@ -208,25 +209,25 @@ Largely already addressed in the prior production-deployment work in this sessio
 
 ## PHASE 15 — Integration Matrix
 
-| Module/Capability | Backend | Frontend (web) | Mobile | AI/Decision | DB |
-|---|---|---|---|---|---|
-| Auth/RBAC | Connected | Connected | Connected | — | OK |
-| Vehicles/Fleet | Connected | Connected | Connected | — | OK |
-| Tactical Map / live fleet positions | Connected | Not connected (placeholder) | — | — | OK |
-| Drivers | Connected | Connected | — | — | OK |
-| Incidents | Connected | Connected | Wrong endpoint used for panic | Two competing creation paths | OK |
-| Evidence Vault (metadata/crypto/custody) | Connected | Not connected (placeholder despite ready data layer) | Metadata only, no byte upload | — | OK |
-| Evidence Vault (object storage bytes) | Not built | N/A | Not built | — | — |
-| Threat Intelligence | Connected | Not connected (placeholder) | Driver lacks threat:read | Cabin signal never reaches decision engine | OK |
-| Behaviour Intelligence | Connected | No caller found | — | Own competing incident path | OK |
-| Cabin Intelligence | Connected | No caller found | — | Never reaches Decision Engine | OK |
-| Threat Decision Engine | Connected | No caller found | — | Manual trigger only, cabin-blind, identity-confidence dropped | OK |
-| SafeCorridor | Connected | No caller found | Broken (wrong path + missing permission) | No link to Decision Engine | OK |
-| Silent SOS | Connected (dedicated neutral-receipt design) | No caller found | Bypassed entirely by panic button | — | OK |
-| Recovery Mesh | Connected | No caller found | — | No incident linkage | OK |
-| Notifications (police/security dispatch) | Send-only wired; no automatic trigger from incidents | Send-only | — | Nothing calls it from the incident path | OK |
-| Realtime (Socket.IO) | Connected (14/15 emitters used) | Connected | — | — | — |
-| Caching/invalidation | Used in 2/21 modules, invalidate() never called | — | — | — | — |
+| Module/Capability                        | Backend                                              | Frontend (web)                                       | Mobile                                   | AI/Decision                                                   | DB  |
+| ---------------------------------------- | ---------------------------------------------------- | ---------------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------- | --- |
+| Auth/RBAC                                | Connected                                            | Connected                                            | Connected                                | —                                                             | OK  |
+| Vehicles/Fleet                           | Connected                                            | Connected                                            | Connected                                | —                                                             | OK  |
+| Tactical Map / live fleet positions      | Connected                                            | Not connected (placeholder)                          | —                                        | —                                                             | OK  |
+| Drivers                                  | Connected                                            | Connected                                            | —                                        | —                                                             | OK  |
+| Incidents                                | Connected                                            | Connected                                            | Wrong endpoint used for panic            | Two competing creation paths                                  | OK  |
+| Evidence Vault (metadata/crypto/custody) | Connected                                            | Not connected (placeholder despite ready data layer) | Metadata only, no byte upload            | —                                                             | OK  |
+| Evidence Vault (object storage bytes)    | Not built                                            | N/A                                                  | Not built                                | —                                                             | —   |
+| Threat Intelligence                      | Connected                                            | Not connected (placeholder)                          | Driver lacks threat:read                 | Cabin signal never reaches decision engine                    | OK  |
+| Behaviour Intelligence                   | Connected                                            | No caller found                                      | —                                        | Own competing incident path                                   | OK  |
+| Cabin Intelligence                       | Connected                                            | No caller found                                      | —                                        | Never reaches Decision Engine                                 | OK  |
+| Threat Decision Engine                   | Connected                                            | No caller found                                      | —                                        | Manual trigger only, cabin-blind, identity-confidence dropped | OK  |
+| SafeCorridor                             | Connected                                            | No caller found                                      | Broken (wrong path + missing permission) | No link to Decision Engine                                    | OK  |
+| Silent SOS                               | Connected (dedicated neutral-receipt design)         | No caller found                                      | Bypassed entirely by panic button        | —                                                             | OK  |
+| Recovery Mesh                            | Connected                                            | No caller found                                      | —                                        | No incident linkage                                           | OK  |
+| Notifications (police/security dispatch) | Send-only wired; no automatic trigger from incidents | Send-only                                            | —                                        | Nothing calls it from the incident path                       | OK  |
+| Realtime (Socket.IO)                     | Connected (14/15 emitters used)                      | Connected                                            | —                                        | —                                                             | —   |
+| Caching/invalidation                     | Used in 2/21 modules, invalidate() never called      | —                                                    | —                                        | —                                                             | —   |
 
 ---
 
@@ -289,18 +290,18 @@ Solid lines = confirmed working connections. Dashed/X = the requested pipeline t
 
 ### Completion & readiness
 
-| Metric | Score | Basis |
-|---|---|---|
-| Overall completion | ~68% | Every module exists and is internally correct; the AI→Decision→Response pipeline and 3 Command Centre surfaces are the largest gaps |
-| System readiness (as a working demo) | Good | Auth, CRUD, dashboard, realtime, mobile auth/offline all genuinely work |
-| Production readiness | Not ready | Silent SOS bypass and the missing incident-orchestration layer are launch-blocking for a safety product |
-| Architecture score | 8/10 | Disciplined layering, single sources of truth for RBAC/logging/pagination; loses points for the missing orchestration layer |
-| Security score | 8/10 | No unguarded routes, no injection/XSS found, correct crypto; loses points for JWT algorithms pinning gap |
-| Performance score | 8/10 | Already hardened in the prior deployment phase; no new bottlenecks found |
-| Scalability score | 8/10 | HPA, PgBouncer, caching pattern exists — but cache invalidation gap will bite under real write load |
-| Code quality score | 6/10 | Good architecture, but zero linting platform-wide and noUnusedLocals off |
-| AI readiness score | 4/10 | Every engine works in isolation with real confidence scoring; none of them are wired into an automatic pipeline, and two engines compete to create incidents |
-| Deployment readiness score | 9/10 | Covered exhaustively in the prior production-deployment work this session — genuinely strong |
+| Metric                               | Score     | Basis                                                                                                                                                        |
+| ------------------------------------ | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Overall completion                   | ~68%      | Every module exists and is internally correct; the AI→Decision→Response pipeline and 3 Command Centre surfaces are the largest gaps                          |
+| System readiness (as a working demo) | Good      | Auth, CRUD, dashboard, realtime, mobile auth/offline all genuinely work                                                                                      |
+| Production readiness                 | Not ready | Silent SOS bypass and the missing incident-orchestration layer are launch-blocking for a safety product                                                      |
+| Architecture score                   | 8/10      | Disciplined layering, single sources of truth for RBAC/logging/pagination; loses points for the missing orchestration layer                                  |
+| Security score                       | 8/10      | No unguarded routes, no injection/XSS found, correct crypto; loses points for JWT algorithms pinning gap                                                     |
+| Performance score                    | 8/10      | Already hardened in the prior deployment phase; no new bottlenecks found                                                                                     |
+| Scalability score                    | 8/10      | HPA, PgBouncer, caching pattern exists — but cache invalidation gap will bite under real write load                                                          |
+| Code quality score                   | 6/10      | Good architecture, but zero linting platform-wide and noUnusedLocals off                                                                                     |
+| AI readiness score                   | 4/10      | Every engine works in isolation with real confidence scoring; none of them are wired into an automatic pipeline, and two engines compete to create incidents |
+| Deployment readiness score           | 9/10      | Covered exhaustively in the prior production-deployment work this session — genuinely strong                                                                 |
 
 ### Critical issues (launch-blocking)
 
@@ -329,17 +330,17 @@ Solid lines = confirmed working connections. Dashed/X = the requested pipeline t
 
 ### Prioritized action plan
 
-| Priority | Action | Est. effort |
-|---|---|---|
-| P0 | Fix mobile panic button to call `POST /sos/activations` instead of `/incidents` | Small |
-| P0 | Fix mobile SafeCorridor endpoint path (`/corridors` → `/corridor/plans`) and grant DRIVER a scoped `threat:read`-equivalent for hotspot zones | Small |
-| P1 | Wire an orchestration step: behaviour/cabin detection → automatically invoke `runDecision` with `context` populated from cabin evidence, and reconcile with `behaviour.service.ts`'s own incident-creation policy so there's one funnel, not two | Medium-large |
-| P1 | Add an automatic hand-off from Decision Engine output → SafeCorridor calculation → notification dispatch → evidence seal → recovery arm (or explicitly document human-in-the-loop by design) | Medium-large |
-| P2 | Wire `EvidencePage`, `FleetPage`, `ThreatIntelligencePage` to their already-built backend APIs | Medium |
-| P2 | Add `invalidate()` calls after writes in `dashboard.service.ts`/`recovery.service.ts` | Small |
-| P2 | Pin `algorithms: ['HS256']` on both `jwt.verify()` calls | Trivial |
-| P3 | Add ESLint + `noUnusedLocals`/`noUnusedParameters` platform-wide | Medium |
-| P3 | Delete confirmed-dead `@workspace/*` packages, `lib/integrations/*` glob, `@replit/connectors-sdk`, `emitFleetSnapshot` | Small |
+| Priority | Action                                                                                                                                                                                                                                           | Est. effort  |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------ |
+| P0       | Fix mobile panic button to call `POST /sos/activations` instead of `/incidents`                                                                                                                                                                  | Small        |
+| P0       | Fix mobile SafeCorridor endpoint path (`/corridors` → `/corridor/plans`) and grant DRIVER a scoped `threat:read`-equivalent for hotspot zones                                                                                                    | Small        |
+| P1       | Wire an orchestration step: behaviour/cabin detection → automatically invoke `runDecision` with `context` populated from cabin evidence, and reconcile with `behaviour.service.ts`'s own incident-creation policy so there's one funnel, not two | Medium-large |
+| P1       | Add an automatic hand-off from Decision Engine output → SafeCorridor calculation → notification dispatch → evidence seal → recovery arm (or explicitly document human-in-the-loop by design)                                                     | Medium-large |
+| P2       | Wire `EvidencePage`, `FleetPage`, `ThreatIntelligencePage` to their already-built backend APIs                                                                                                                                                   | Medium       |
+| P2       | Add `invalidate()` calls after writes in `dashboard.service.ts`/`recovery.service.ts`                                                                                                                                                            | Small        |
+| P2       | Pin `algorithms: ['HS256']` on both `jwt.verify()` calls                                                                                                                                                                                         | Trivial      |
+| P3       | Add ESLint + `noUnusedLocals`/`noUnusedParameters` platform-wide                                                                                                                                                                                 | Medium       |
+| P3       | Delete confirmed-dead `@workspace/*` packages, `lib/integrations/*` glob, `@replit/connectors-sdk`, `emitFleetSnapshot`                                                                                                                          | Small        |
 
 ---
 
