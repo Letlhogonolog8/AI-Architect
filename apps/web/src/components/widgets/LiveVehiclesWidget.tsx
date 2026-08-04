@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { VehicleStatus } from '@aegisdrive/types';
 import { Badge, StatusPill, cn } from '@aegisdrive/ui';
 import { relativeTime } from '@aegisdrive/shared';

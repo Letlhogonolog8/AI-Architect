@@ -1,4 +1,4 @@
-import { useParams } from 'react-router-dom';
+import { useParams } from 'react-router';
 import { Ban } from 'lucide-react';
 import { Button, PageHeader, Panel, StatusPill, ThreatGauge } from '@aegisdrive/ui';
 import { humaniseEnum, relativeTime } from '@aegisdrive/shared';

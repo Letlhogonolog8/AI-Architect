@@ -46,7 +46,7 @@ export default defineConfig({
         // The map and charting layers are heavy and not needed to render the
         // login screen, so they are split out of the entry chunk.
         manualChunks: {
-          react: ['react', 'react-dom', 'react-router-dom'],
+          react: ['react', 'react-dom', 'react-router'],
           query: ['@tanstack/react-query'],
           motion: ['framer-motion'],
         },

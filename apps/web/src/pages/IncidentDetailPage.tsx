@@ -1,4 +1,4 @@
-import { useParams } from 'react-router-dom';
+import { useParams } from 'react-router';
 import { Radio } from 'lucide-react';
 import { Button, PageHeader, Panel, StatusPill, Surface } from '@aegisdrive/ui';
 import { humaniseEnum, relativeTime } from '@aegisdrive/shared';

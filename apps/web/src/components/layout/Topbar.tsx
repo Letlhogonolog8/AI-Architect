@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { Bell, LogOut, Search, Wifi, WifiOff } from 'lucide-react';
 import { Badge, Button, StatusPill, cn } from '@aegisdrive/ui';
 import { fullName, initials } from '@aegisdrive/shared';

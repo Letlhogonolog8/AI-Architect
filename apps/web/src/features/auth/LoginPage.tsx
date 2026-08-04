@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router';
 import { motion } from 'framer-motion';
 import { Lock, Mail, ShieldCheck } from 'lucide-react';
 import { Button, Field, Input, Surface } from '@aegisdrive/ui';

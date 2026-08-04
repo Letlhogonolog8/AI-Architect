@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { Sparkles } from 'lucide-react';
 import { Badge, StatusPill, cn } from '@aegisdrive/ui';
 import { relativeTime } from '@aegisdrive/shared';
