@@ -5,6 +5,12 @@
 # Datastores only by default. The API and web client run on the host under
 # `pnpm dev` so that hot reload works; bring up the `full` profile to run
 # everything in containers the way production does.
+#
+# Variables are read from `infra/docker/.env` — Compose resolves its env file
+# against the project directory, which is the directory holding the first `-f`
+# file, NOT the working directory the command was run from. A `.env` at the
+# repository root is not read by this stack. Copy `.env.example` in THIS
+# directory. Only the `full` profile needs it; the datastores need nothing.
 
 name: aegisdrive
 
@@ -68,10 +74,19 @@ services:
       PORT: 4000
       DATABASE_URL: postgresql://aegis:aegis@postgres:5432/aegisdrive?schema=public
       REDIS_URL: redis://redis:6379
-      # Development-only values. Production secrets come from the orchestrator's
-      # secret store, never from a compose file.
-      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?set JWT_ACCESS_SECRET in your shell or .env}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?set JWT_REFRESH_SECRET in your shell or .env}
+      # Development-only values, read from `infra/docker/.env` — see the note on
+      # env-file location at the top of this file. Production secrets come from
+      # the orchestrator's secret store, never from a compose file.
+      #
+      # Deliberately `:-` and not `:?`. Compose interpolates every service in the
+      # file before it applies profile filtering, so a `:?` here fails the plain
+      # `up -d` that is only asking for postgres and redis. The guard is not
+      # lost: `apps/api/src/config/env.ts` requires both secrets to be at least
+      # 32 characters and, because NODE_ENV is production here, to differ from
+      # each other. An unset secret exits the container on boot with a report
+      # naming the variable, rather than running with a weak one.
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-}
       CORS_ORIGINS: http://localhost:8080
     ports:
       - '4000:4000'
