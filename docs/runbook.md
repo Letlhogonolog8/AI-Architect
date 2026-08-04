@@ -39,6 +39,23 @@ pnpm --filter @aegisdrive/evidence-service run dev
 The web dev server proxies `/api` and `/realtime` to the API, so the browser
 sees one origin and the refresh cookie stays first-party.
 
+### Running the stack in containers instead
+
+`docker compose ... up -d` starts postgres and redis alone and needs no
+configuration. Running the API and workers in containers as well needs the two
+JWT secrets, and Compose reads them from `infra/docker/.env` — its env file
+resolves against the directory holding the compose file, not the directory you
+run the command from, so a `.env` at the repository root is not read:
+
+```bash
+cp infra/docker/.env.example infra/docker/.env   # then fill in both secrets
+docker compose -f infra/docker/docker-compose.yml --profile full up -d
+```
+
+Leaving them unset does not fail the `up`; the api container exits immediately
+with the config report described below, because `src/config/env.ts` is the
+enforcement point.
+
 ## Verification
 
 ```bash
