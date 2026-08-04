@@ -274,7 +274,7 @@ jobs:
       # the same reason: a hard fail on every low-severity OS package finding
       # trains people to bypass the gate.
       - name: Scan ${{ matrix.name }} for vulnerabilities
-        uses: aquasecurity/trivy-action@0.29.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: aegisdrive/${{ matrix.name }}:ci
           severity: HIGH,CRITICAL
