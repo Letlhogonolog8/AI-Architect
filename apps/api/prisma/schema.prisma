@@ -15,7 +15,15 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  // Runtime connection. On Supabase this is the transaction pooler (port 6543):
+  // the API holds a connection pool across many concurrent requests, which is
+  // exactly what the pooler exists for.
   url      = env("DATABASE_URL")
+  // Migrations and introspection. The transaction pooler cannot run them —
+  // they need session-level state (advisory locks, prepared statements) that a
+  // transaction-mode pooler does not carry. This is the direct connection
+  // (port 5432). Point both at the same URL when there is no pooler in front.
+  directUrl = env("DIRECT_URL")
 }
 
 // ============================================================================

@@ -427,6 +427,7 @@ export const ListVehiclesStatus = {
 export type ListIncidentsParams = {
 status?: ListIncidentsStatus;
 vehicleId?: number;
+driverId?: number;
 severity?: ListIncidentsSeverity;
 };
 

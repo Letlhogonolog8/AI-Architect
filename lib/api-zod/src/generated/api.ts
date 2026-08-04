@@ -238,6 +238,7 @@ export const UpdateDriverResponse = zod.object({
 export const ListIncidentsQueryParams = zod.object({
   "status": zod.enum(['active', 'investigating', 'resolved', 'escalated']).optional(),
   "vehicleId": zod.coerce.number().optional(),
+  "driverId": zod.coerce.number().optional(),
   "severity": zod.enum(['low', 'medium', 'high', 'critical']).optional()
 })
 

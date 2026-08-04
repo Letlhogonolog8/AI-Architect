@@ -11,5 +11,6 @@ import type { ListIncidentsStatus } from './listIncidentsStatus';
 export type ListIncidentsParams = {
 status?: ListIncidentsStatus;
 vehicleId?: number;
+driverId?: number;
 severity?: ListIncidentsSeverity;
 };

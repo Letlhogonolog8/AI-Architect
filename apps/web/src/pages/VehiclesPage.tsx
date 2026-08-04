@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { Plus, Search } from 'lucide-react';
 import { Button, Input, PageHeader, Panel, StatusPill } from '@aegisdrive/ui';
 import { humaniseEnum, relativeTime } from '@aegisdrive/shared';

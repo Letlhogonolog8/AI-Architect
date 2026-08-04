@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink } from 'react-router';
 import { ChevronsLeft, ShieldCheck } from 'lucide-react';
 import { cn } from '@aegisdrive/ui';
 import { APP_NAME } from '@aegisdrive/shared';

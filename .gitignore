@@ -11,6 +11,13 @@ out-tsc
 # dependencies
 node_modules
 
+# secrets — every .env holds live credentials (JWT signing keys, database
+# passwords). Only the .example files are tracked.
+.env
+.env.*
+!.env.example
+!.env.*.example
+
 # Python — services/ai
 __pycache__/
 *.py[cod]
@@ -48,6 +55,9 @@ testem.log
 # System Files
 .DS_Store
 Thumbs.db
+
+# Word/Office lock files, written next to an open document
+~$*
 
 .cursor/rules/nx-rules.mdc
 .github/instructions/nx.instructions.md

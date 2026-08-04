@@ -235,6 +235,10 @@ paths:
           schema:
             type: number
         - in: query
+          name: driverId
+          schema:
+            type: number
+        - in: query
           name: severity
           schema:
             type: string

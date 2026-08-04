@@ -5,7 +5,11 @@
 FROM node:22-alpine AS base
 ENV PNPM_HOME=/pnpm
 ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable
+# Pinned, not floating: bare `corepack enable` resolves pnpm at build time, so
+# the image silently followed pnpm to 11 while CI stayed on 10 — a different
+# package manager than the one the lockfile (lockfileVersion 9.0) was written
+# by. Keep this in step with `version:` in .github/workflows/*.yml.
+RUN corepack enable && corepack prepare pnpm@10.34.5 --activate
 WORKDIR /repo
 
 FROM base AS deps
@@ -31,10 +35,15 @@ ENV VITE_API_BASE_URL=$VITE_API_BASE_URL \
     VITE_REALTIME_URL=$VITE_REALTIME_URL \
     VITE_MAPBOX_TOKEN=$VITE_MAPBOX_TOKEN \
     VITE_APP_ENVIRONMENT=$VITE_APP_ENVIRONMENT
-RUN pnpm --filter @aegisdrive/web run typecheck \
+# See apps/api/Dockerfile: the referenced workspace libraries must be emitted
+# before this app can typecheck against them. Web also uses packages/ui.
+RUN pnpm exec tsc --build packages/types packages/shared packages/ui \
+ && pnpm --filter @aegisdrive/web run typecheck \
  && pnpm --filter @aegisdrive/web run build
 
-FROM nginx:1.27-alpine AS production
+# 1.31, not 1.27: the older tag sits on Alpine 3.21, which Trivy flags for 35
+# HIGH/CRITICAL OS advisories. 1.31 is Alpine 3.24 and currently scans clean.
+FROM nginx:1.31-alpine AS production
 COPY --from=build /repo/apps/web/dist /usr/share/nginx/html
 COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
 

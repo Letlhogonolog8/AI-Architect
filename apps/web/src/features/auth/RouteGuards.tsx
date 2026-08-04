@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router';
 import type { Permission } from '@aegisdrive/types';
 import { useAuthStore } from '@/stores/auth.store';
 import { routes } from '@/config/routes';

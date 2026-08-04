@@ -1,4 +1,4 @@
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router';
 import { motion } from 'framer-motion';
 import { useUiStore } from '@/stores/ui.store';
 import { useCommandCentreStore } from '@/stores/command-centre.store';

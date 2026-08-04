@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { ShieldX } from 'lucide-react';
 import { EmptyState, Surface } from '@aegisdrive/ui';
 import { useCurrentUser } from '@/stores/auth.store';

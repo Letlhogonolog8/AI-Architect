@@ -22,6 +22,7 @@ router.get("/incidents", async (req, res): Promise<void> => {
   const conditions = [];
   if (query.data.status) conditions.push(eq(incidentsTable.status, query.data.status));
   if (query.data.vehicleId) conditions.push(eq(incidentsTable.vehicleId, query.data.vehicleId));
+  if (query.data.driverId) conditions.push(eq(incidentsTable.driverId, query.data.driverId));
   if (query.data.severity) conditions.push(eq(incidentsTable.severity, query.data.severity));
 
   const incidents = await db
