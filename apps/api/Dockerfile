@@ -11,7 +11,7 @@ ENV PATH="$PNPM_HOME:$PATH"
 # the image silently followed pnpm to 11 while CI stayed on 10 — a different
 # package manager than the one the lockfile (lockfileVersion 9.0) was written
 # by. Keep this in step with `version:` in .github/workflows/*.yml.
-RUN corepack enable && corepack prepare pnpm@10.15.0 --activate
+RUN corepack enable && corepack prepare pnpm@10.34.5 --activate
 WORKDIR /repo
 
 # ------------------------------------------------------------ dependencies
@@ -57,7 +57,14 @@ RUN CLIENT_DIR="$(readlink -f apps/api/node_modules/@prisma/client)" \
  && cp -RL "$STORE_MODULES/.prisma" /export/node_modules/.prisma
 
 # ------------------------------------------------------------- production
-FROM base AS production
+# Deliberately NOT `FROM base`: base carries corepack and pnpm, and the node
+# image ships npm. A runtime that only executes `node dist/index.mjs` needs
+# neither, and shipping them accounted for every one of the 35 HIGH/CRITICAL
+# findings Trivy raised against this image — all in package-manager tooling,
+# none in the application. Removing them fixes the class rather than chasing
+# each advisory, and shrinks the image.
+FROM node:22-alpine AS production
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 ENV NODE_ENV=production
 WORKDIR /app
 

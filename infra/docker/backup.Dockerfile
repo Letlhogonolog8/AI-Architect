@@ -9,6 +9,13 @@ FROM postgres:16-alpine
 
 RUN apk add --no-cache rclone bash
 
+# gosu ships with the postgres image so its own entrypoint can drop privileges.
+# This image replaces that entrypoint with backup.sh, which calls only pg_dump,
+# gzip and rclone and already runs as `postgres` — so gosu is dead weight, and
+# it is a Go binary carrying 15 HIGH/CRITICAL advisories that no base-image
+# upgrade clears. Removing it is both the smaller and the safer image.
+RUN rm -f /usr/local/bin/gosu
+
 # Paths are relative to the repository root, which is the build context every
 # image here uses (see the `docker` job in .github/workflows/ci.yml). Bare
 # `backup.sh` would only resolve if the context were infra/docker.

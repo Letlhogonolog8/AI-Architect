@@ -9,7 +9,7 @@ ENV PATH="$PNPM_HOME:$PATH"
 # the image silently followed pnpm to 11 while CI stayed on 10 — a different
 # package manager than the one the lockfile (lockfileVersion 9.0) was written
 # by. Keep this in step with `version:` in .github/workflows/*.yml.
-RUN corepack enable && corepack prepare pnpm@10.15.0 --activate
+RUN corepack enable && corepack prepare pnpm@10.34.5 --activate
 WORKDIR /repo
 
 FROM base AS deps
@@ -41,7 +41,9 @@ RUN pnpm exec tsc --build packages/types packages/shared packages/ui \
  && pnpm --filter @aegisdrive/web run typecheck \
  && pnpm --filter @aegisdrive/web run build
 
-FROM nginx:1.27-alpine AS production
+# 1.31, not 1.27: the older tag sits on Alpine 3.21, which Trivy flags for 35
+# HIGH/CRITICAL OS advisories. 1.31 is Alpine 3.24 and currently scans clean.
+FROM nginx:1.31-alpine AS production
 COPY --from=build /repo/apps/web/dist /usr/share/nginx/html
 COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
 
