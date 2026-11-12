@@ -7,7 +7,7 @@
 #     --build-arg SERVICE_NAME=telemetry \
 #     --build-arg SERVICE_PACKAGE=@aegisdrive/telemetry-service .
 
-FROM node:22-alpine AS base
+FROM node:26-alpine AS base
 ENV PNPM_HOME=/pnpm
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
